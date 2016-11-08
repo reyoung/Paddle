@@ -12,7 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #include <gtest/gtest.h>
 #include <paddle/utils/Util.h>
 #include <paddle/utils/Version.h>
@@ -24,7 +23,7 @@ limitations under the License. */
 P_DECLARE_int32(seed);
 
 using namespace paddle;  // NOLINT
-using namespace std;  // NOLINT
+using namespace std;     // NOLINT
 class TrainerForTest : public paddle::Trainer {
 public:
   void startTrain() {
@@ -44,11 +43,10 @@ public:
    */
   size_t getTotalParameterSize() const {
     auto p = const_cast<TrainerForTest*>(this);
-    auto & params = p->getGradientMachine()->getParameters();
-    return std::accumulate(params.begin(), params.end(), 0UL,
-                           [](size_t a, const ParameterPtr& p){
-      return a+p->getSize();
-    });
+    auto& params = p->getGradientMachine()->getParameters();
+    return std::accumulate(
+        params.begin(), params.end(), 0UL,
+        [](size_t a, const ParameterPtr& p) { return a + p->getSize(); });
   }
 };
 
@@ -73,6 +71,7 @@ void CalCost(const string& conf, const string& dir, real* cost,
 
   *ThreadLocalRand::getSeed() = FLAGS_seed;
   vecW.randnorm(0, 0.1);
+  vecMomentum.randnorm(0, 0.1);
 
   trainer.startTrain();
   for (int i = 0; i < num_passes; ++i) {
@@ -92,7 +91,11 @@ void CalCost(const string& conf, const string& dir, real* cost,
   rmDir(dir.c_str());
 }
 
-void test(const string& conf1, const string& conf2, double eps) {
+void test(const string& conf1, const string& conf2, double eps, bool useGpu) {
+  if (!paddle::version::isWithGpu() && useGpu) {
+    return;
+  }
+  FLAGS_use_gpu = useGpu;
   int num_passes = 5;
   real* cost1 = new real[num_passes];
   const string dir1 = "gserver/tests/t1";
@@ -113,17 +116,36 @@ void test(const string& conf1, const string& conf2, double eps) {
 }
 
 TEST(RecurrentGradientMachine, HasSubSequence) {
-  test("gserver/tests/sequence_layer_group.conf",
-       "gserver/tests/sequence_nest_layer_group.conf",
-       1e-5);
+  for (bool useGpu : {false, true}) {
+    test("gserver/tests/sequence_layer_group.conf",
+         "gserver/tests/sequence_nest_layer_group.conf",
+         1e-5, useGpu);
+  }
 }
 
 TEST(RecurrentGradientMachine, rnn) {
-  test("gserver/tests/sequence_rnn.conf",
-       "gserver/tests/sequence_nest_rnn.conf",
-       0);
+  for (bool useGpu : {false, true}) {
+    test("gserver/tests/sequence_rnn.conf",
+         "gserver/tests/sequence_nest_rnn.conf",
+         1e-6, useGpu);
+  }
 }
 
+TEST(RecurrentGradientMachine, rnn_multi_input) {
+  for (bool useGpu : {false, true}) {
+    test("gserver/tests/sequence_rnn_multi_input.conf",
+         "gserver/tests/sequence_nest_rnn_multi_input.conf",
+         1e-6, useGpu);
+  }
+}
+
+TEST(RecurrentGradientMachine, rnn_multi_unequalength_input) {
+    for (bool useGpu : {false, true}) {
+        test("gserver/tests/sequence_rnn_multi_unequalength_inputs.conf",
+        "gserver/tests/sequence_nest_rnn_multi_unequalength_inputs.conf",
+             1e-6, useGpu);
+    }
+}
 
 int main(int argc, char** argv) {
   if (paddle::version::isWithPyDataProvider()) {

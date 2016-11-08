@@ -18,6 +18,7 @@ limitations under the License. */
 #include "paddle/gserver/layers/DataLayer.h"
 #include "ModelConfig.pb.h"
 #include "paddle/trainer/Trainer.h"
+#include "paddle/math/MathUtils.h"
 
 #include "TestUtil.h"
 #include "LayerGradUtil.h"
@@ -50,7 +51,7 @@ TEST(Operator, dot_mul) {
 TEST(Projection, context) {
   for (auto contextStart : {-5, -3, -1, 0, 3}) {
     for (auto contextLength : {1, 2, 5, 7}) {
-      for (auto batchSize : {1, 2, 5, 20, 100}) {
+      for (auto batchSize : {1, 2, 5, 20, 50}) {
         for (auto trainablePadding : {false, true}) {
           LOG(INFO) << " contextStart=" << contextStart
                     << " contextLength=" << contextLength
@@ -133,6 +134,46 @@ TEST(Projection, identity) {
                        /* batchSize */ 100, useGpu);
   }
 }
+
+#ifndef PADDLE_ONLY_CPU
+TEST(Projection, conv) {
+  const int NUM_FILTERS = 16;
+  const int FILTER_SIZE = 2;
+  const int FILTER_SIZE_Y = 3;
+  const int CHANNELS = 3;
+  const int IMAGE_SIZE = 16;
+
+  ProjectionConfig conf;
+  conf.set_type("conv");
+  conf.set_num_filters(NUM_FILTERS);
+
+  ConvConfig* conv = conf.mutable_conv_conf();
+  conv->set_filter_size(FILTER_SIZE);
+  conv->set_filter_size_y(FILTER_SIZE_Y);
+  conv->set_channels(CHANNELS);
+  conv->set_padding(0);
+  conv->set_padding_y(1);
+  conv->set_stride(2);
+  conv->set_stride_y(2);
+  conv->set_groups(1);
+  conv->set_filter_channels(conv->channels() / conv->groups());
+  conv->set_img_size(IMAGE_SIZE);
+  int output_x =
+      outputSize(conv->img_size(), conv->filter_size(), conv->padding(),
+                 conv->stride(), /* caffeMode */ true);
+  int output_y =
+      outputSize(conv->img_size(), conv->filter_size_y(), conv->padding_y(),
+                 conv->stride_y(), /* caffeMode */ true);
+  conv->set_output_x(output_x);
+  conf.set_input_size(IMAGE_SIZE * IMAGE_SIZE * CHANNELS);
+  conf.set_output_size(output_x * output_y * NUM_FILTERS);
+
+  testProjectionGrad(
+      conf, INPUT_DATA,
+      /* parameterSize */ NUM_FILTERS * CHANNELS * FILTER_SIZE * FILTER_SIZE_Y,
+      /* batchSize */ 100, true, false, NUM_FILTERS, true);
+}
+#endif
 
 TEST(Layer, concat) {
   TestConfig config;
@@ -254,10 +295,9 @@ void testConvLayer(const string& type, bool trans, bool useGpu) {
   conv->set_groups(1);
   conv->set_filter_channels(conv->channels() / conv->groups());
   conv->set_img_size(16);
-  conv->set_output_x(
-      (2 * conv->padding() + conv->img_size() - conv->filter_size()) /
-          ((float)conv->stride()) +
-      1.5);
+  conv->set_output_x(outputSize(conv->img_size(), conv->filter_size(),
+                                conv->padding(), conv->stride(),
+                                /* caffeMode */ true));
   config.layerConfig.set_size(conv->output_x() * conv->output_x() *
                               config.layerConfig.num_filters());
 
@@ -290,15 +330,13 @@ TEST(Layer, blockExpandLayer) {
   blockExpand->set_stride_x(2);
   blockExpand->set_stride_y(2);
   blockExpand->set_output_x(
-      1 +
-      (2 * blockExpand->padding_x() + blockExpand->img_size_x() -
-       blockExpand->block_x() + blockExpand->stride_x() - 1) /
-          blockExpand->stride_x());
+      outputSize(blockExpand->img_size_x(), blockExpand->block_x(),
+                 blockExpand->padding_x(), blockExpand->stride_x(),
+                 /* caffeMode */ false));
   blockExpand->set_output_y(
-      1 +
-      (2 * blockExpand->padding_y() + blockExpand->img_size_y() -
-       blockExpand->block_y() + blockExpand->stride_y() - 1) /
-          blockExpand->stride_y());
+      outputSize(blockExpand->img_size_y(), blockExpand->block_y(),
+                 blockExpand->padding_y(), blockExpand->stride_y(),
+                 /* caffeMode */ false));
   config.layerConfig.set_size(blockExpand->block_x() * blockExpand->block_y() *
                               blockExpand->channels());
 
@@ -307,6 +345,24 @@ TEST(Layer, blockExpandLayer) {
   }
 }
 
+TEST(Layer, maxoutLayer) {
+  TestConfig config;
+  config.biasSize = 0;
+  config.layerConfig.set_type("maxout");
+
+  config.inputDefs.push_back({INPUT_DATA, "layer_0", 4096, 0});
+  LayerInputConfig* input = config.layerConfig.add_inputs();
+  MaxOutConfig* maxout = input->mutable_maxout_conf();
+
+  maxout->set_img_size_x(32);
+  maxout->set_img_size_y(32);
+  maxout->set_channels(4);
+  maxout->set_groups(2);
+
+  for (auto useGpu : {false, true}) {
+    testLayerGrad(config, "maxout", 10, false, useGpu);
+  }
+}
 void testFcLayer(string format, size_t nnz) {
   TestConfig config;
   config.biasSize = 4096;
@@ -791,21 +847,24 @@ void setPoolConfig(TestConfig* config, PoolConfig* pool,
   (*config).biasSize = 0;
   (*config).layerConfig.set_type("pool");
   (*config).layerConfig.set_num_filters(16);
-  (*config).layerConfig.set_partial_sum(1);
-  (*config).layerConfig.set_shared_biases(true);
 
+  int kw = 3, kh = 3;
+  int pw = 0, ph = 0;
+  int sw = 2, sh = 2;
   pool->set_pool_type(poolType);
   pool->set_channels(16);
-  pool->set_size_x(3);
-  if (poolType == "cudnn-max-pool" || poolType == "cudnn-avg-pool") {
-    pool->set_padding(0);
-  } else {
-    pool->set_start(0);
-  }
-  pool->set_stride(2);
-  pool->set_output_x((pool->img_size() - pool->start() - pool->size_x()) /
-                         ((float)pool->stride()) +
-                     1.5);
+  pool->set_size_x(kw);
+  pool->set_size_y(kh);
+  pool->set_start(0);
+  pool->set_padding(pw);
+  pool->set_padding_y(ph);
+  pool->set_stride(sw);
+  pool->set_stride_y(sh);
+
+  int ow = outputSize(pool->img_size(), kw, pw, sw, /* caffeMode */ false);
+  int oh = outputSize(pool->img_size_y(), kh, ph, sh, /* caffeMode */ false);
+  pool->set_output_x(ow);
+  pool->set_output_y(oh);
 }
 
 void testPoolLayer(const string& poolType, bool trans, bool useGpu) {
@@ -814,9 +873,10 @@ void testPoolLayer(const string& poolType, bool trans, bool useGpu) {
   LayerInputConfig* input = config.layerConfig.add_inputs();
   PoolConfig* pool = input->mutable_pool_conf();
 
-  setPoolConfig(&config, pool, poolType);
   pool->set_img_size(14);
-  config.layerConfig.set_size(pool->output_x() * pool->output_x() *
+  pool->set_img_size_y(14);
+  setPoolConfig(&config, pool, poolType);
+  config.layerConfig.set_size(pool->output_x() * pool->output_y() *
                               pool->channels());
 
   testLayerGrad(config, "pool", 100, trans, useGpu);
@@ -829,11 +889,11 @@ void testPoolLayer2(const string& poolType, bool trans, bool useGpu) {
   LayerInputConfig* input = config.layerConfig.add_inputs();
   PoolConfig* pool = input->mutable_pool_conf();
 
-  setPoolConfig(&config, pool, poolType);
   pool->set_size_y(4);
   pool->set_stride_y(3);
   pool->set_img_size(10);
   pool->set_img_size_y(20);
+  setPoolConfig(&config, pool, poolType);
   pool->set_output_y((pool->img_size_y() - pool->start() - pool->size_y()) /
                          ((float)pool->stride_y()) +
                      1.5);
@@ -935,7 +995,7 @@ TEST(Layer, LstmLayer) {
   TestConfig config;
   config.layerConfig.set_type("lstmemory");
   config.layerConfig.set_size(4);
-  config.layerConfig.set_active_type("sigmoid");
+  config.layerConfig.set_active_type("tanh");
   config.layerConfig.set_active_state_type("sigmoid");
   config.layerConfig.set_active_gate_type("sigmoid");
   config.biasSize = 28;
@@ -1194,12 +1254,11 @@ TEST(Operator, conv) {
   conv->set_groups(1);
   conv->set_filter_channels(conv->channels() / conv->groups());
   conv->set_img_size(IMAGE_SIZE);
-  int outputSize =
-      int(1.0 * (2 * conv->padding() + conv->img_size() - conv->filter_size()) /
-          conv->stride()) +
-      1;
-  conv->set_output_x(outputSize);
-  config.layerConfig.set_size(outputSize * outputSize *
+  int output_x =
+      outputSize(conv->img_size(), conv->filter_size(), conv->padding(),
+                 conv->stride(), /* caffeMode */ true);
+  conv->set_output_x(output_x);
+  config.layerConfig.set_size(output_x * output_x *
                               config.layerConfig.num_filters());
   config.layerConfig.set_size(conv->output_x() * conv->output_x() *
                               NUM_FILTERS);
@@ -1251,8 +1310,6 @@ TEST(Layer, MultiplexLayer) {
     testLayerGrad(config, "multiplex", 512, /* trans= */ false, useGpu);
   }
 }
-
-
 
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);

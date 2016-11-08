@@ -15,6 +15,19 @@
 try:
     from paddle_api_config import *
     import os.path
+    import platform
+
+    system = platform.system().lower()
+    is_osx = (system == 'darwin')
+    is_win = (system == 'windows')
+    is_lin = (system == 'linux')
+
+    if is_lin:
+        whole_start = "-Wl,--whole-archive"
+        whole_end = "-Wl,--no-whole-archive"
+    elif is_osx:
+        whole_start = ""
+        whole_end = ""
 
     LIB_DIRS = ["math", 'utils', 'parameter', "gserver", "api", "cuda", "pserver", "trainer"]
     PARENT_LIB_DIRS = ['proto']
@@ -25,6 +38,7 @@ try:
             self.paddle_build_dir = os.path.abspath(self.paddle_build_dir)
             self.with_gpu = PaddleLDFlag.cmake_bool(WITH_GPU)
             self.protolib = PROTOBUF_LIB
+            self.zlib = ZLIB_LIB
             self.thread = CMAKE_THREAD_LIB
             self.dl_libs = CMAKE_DL_LIBS
             self.with_python = PaddleLDFlag.cmake_bool(WITH_PYTHON)
@@ -34,6 +48,7 @@ try:
             self.glog_libs = LIBGLOG_LIBRARY
 
             self.with_gflags = PaddleLDFlag.cmake_bool(WITH_GFLAGS)
+            self.with_coverage = PaddleLDFlag.cmake_bool(WITH_COVERALLS)
             self.gflags_libs = GFLAGS_LIBRARIES
             self.gflags_location = GFLAGS_LOCATION
             self.cblas_libs = CBLAS_LIBRARIES
@@ -51,14 +66,14 @@ try:
 
         def parent_dir_str(self):
             libdirs = PARENT_LIB_DIRS
-            return " ".join(map(lambda x: "-L" + os.path.join(self.paddle_build_dir, '..', x), 
+            return " ".join(map(lambda x: "-L" + os.path.join(self.paddle_build_dir, '..', x),
                 libdirs))
 
         def libs_str(self):
             libs = [
-                "-Wl,--whole-archive",
+                whole_start,
                 "-lpaddle_gserver",
-                "-Wl,--no-whole-archive",
+                whole_end,
                 "-lpaddle_pserver",
                 "-lpaddle_trainer_lib",
                 "-lpaddle_network",
@@ -69,6 +84,7 @@ try:
                 "-lpaddle_cuda",
                 "-lpaddle_api",
                 self.normalize_flag(self.protolib),
+                self.normalize_flag(self.zlib),
                 self.normalize_flag(self.thread),
                 self.normalize_flag(self.dl_libs),
                 self.normalize_flag(self.cblas_libs),
@@ -82,6 +98,8 @@ try:
                 libs.append(self.normalize_flag(self.gflags_libs))
             if self.with_gpu:
                 libs.append(self.normalize_flag(self.curt))
+            if self.with_coverage:
+                libs.append("-fprofile-arcs")
             return " ".join(filter(lambda l: len(l) != 0, libs))
 
         def normalize_flag(self, cmake_flag):
@@ -118,8 +136,14 @@ try:
                 return False
             else:
                 return True
-
+        def c_flag(self):
+            if self.with_coverage:
+                return ["-fprofile-arcs", "-ftest-coverage", "-O0", "-g"]
+            else:
+                return None
 except ImportError:
     class PaddleLDFlag(object):
         def ldflag_str(self):
+            pass
+        def c_flag(self):
             pass

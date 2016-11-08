@@ -1,16 +1,55 @@
 # Some common routine for paddle compile.
 
-
 # target_circle_link_libraries
 # Link libraries to target which has circle dependencies.
 #
 # First Argument: target name want to be linked with libraries
 # Rest Arguments: libraries which link together.
 function(target_circle_link_libraries TARGET_NAME)
-    target_link_libraries(${TARGET_NAME}
-        -Wl,--start-group
-        ${ARGN}
-        -Wl,--end-group)
+    if(APPLE)
+        set(LIBS)
+        set(inArchive OFF)
+        set(libsInArgn)
+
+        foreach(arg ${ARGN})
+            if(${arg} STREQUAL "ARCHIVE_START")
+                set(inArchive ON)
+            elseif(${arg} STREQUAL "ARCHIVE_END")
+                set(inArchive OFF)
+            else()
+                if(inArchive)
+                    list(APPEND LIBS "-Wl,-force_load")
+                endif()
+                list(APPEND LIBS ${arg})
+                list(APPEND libsInArgn ${arg})
+            endif()
+        endforeach()
+        if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+            list(APPEND LIBS "-undefined dynamic_lookup")
+        endif()
+        list(REVERSE libsInArgn)
+        target_link_libraries(${TARGET_NAME}
+            ${LIBS}
+            ${libsInArgn})
+
+    else()  # LINUX
+        set(LIBS)
+
+        foreach(arg ${ARGN})
+            if(${arg} STREQUAL "ARCHIVE_START")
+                list(APPEND LIBS "-Wl,--whole-archive")
+            elseif(${arg} STREQUAL "ARCHIVE_END")
+                list(APPEND LIBS "-Wl,--no-whole-archive")
+            else()
+                list(APPEND LIBS ${arg})
+            endif()
+        endforeach()
+
+        target_link_libraries(${TARGET_NAME}
+                "-Wl,--start-group"
+                ${LIBS}
+                "-Wl,--end-group")
+    endif()
 endfunction()
 
 # compile_cu_as_cpp
@@ -28,6 +67,10 @@ endmacro()
 #
 # It will handle WITH_PYTHON/WITH_GLOG etc.
 function(link_paddle_exe TARGET_NAME)
+    if(WITH_RDMA)
+        generate_rdma_links()
+    endif()
+
     if(WITH_METRIC)
         if(WITH_GPU)
             set(METRIC_LIBS paddle_metric_learning paddle_dserver_lib metric metric_cpu)
@@ -41,20 +84,20 @@ function(link_paddle_exe TARGET_NAME)
     if(PADDLE_WITH_INTERNAL)
         set(INTERAL_LIBS paddle_internal_gserver paddle_internal_parameter)
         target_circle_link_libraries(${TARGET_NAME}
-            -Wl,--whole-archive
+            ARCHIVE_START
             paddle_internal_gserver
             paddle_internal_owlqn
-            -Wl,--no-whole-archive
+            ARCHIVE_END
             paddle_internal_parameter)
     else()
         set(INTERAL_LIBS "")
     endif()
 
     target_circle_link_libraries(${TARGET_NAME}
-        -Wl,--whole-archive
+        ARCHIVE_START
         paddle_gserver
         ${METRIC_LIBS}
-        -Wl,--no-whole-archive
+        ARCHIVE_END
         paddle_pserver
         paddle_trainer_lib
         paddle_network
@@ -70,6 +113,12 @@ function(link_paddle_exe TARGET_NAME)
         ${ZLIB_LIBRARIES}
         ${INTERAL_LIBS}
         ${CMAKE_DL_LIBS})
+
+    if(WITH_RDMA)
+        target_link_libraries(${TARGET_NAME}
+            ${RDMA_LD_FLAGS}
+            ${RDMA_LIBS})
+    endif()
     
     if(WITH_PYTHON)
         target_link_libraries(${TARGET_NAME}
@@ -139,9 +188,18 @@ macro(add_simple_unittest TARGET_NAME)
     add_unittest(${TARGET_NAME} ${TARGET_NAME}.cpp)
 endmacro()
 
-macro(add_paddle_culib TARGET_NAME)
-    set(NVCC_FLAG ${CUDA_NVCC_FLAGS})
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};--use_fast_math)
-    cuda_add_library(${TARGET_NAME} STATIC ${ARGN})
-    set(CUDA_NVCC_FLAGS ${NVCC_FLAG})
-endmacro()
+# Creates C resources file from files in given resource file
+function(create_resources res_file output)
+    # Create empty output file
+    file(WRITE ${output} "")
+    # Get short filename
+    string(REGEX MATCH "([^/]+)$" filename ${res_file})
+    # Replace filename spaces & extension separator for C compatibility
+    string(REGEX REPLACE "\\.| |-" "_" filename ${filename})
+    # Read hex data from file
+    file(READ ${res_file} filedata HEX)
+    # Convert hex data for C compatibility
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," filedata ${filedata})
+    # Append data to output file
+    file(APPEND ${output} "const unsigned char ${filename}[] = {${filedata}};\nconst unsigned ${filename}_size = sizeof(${filename});\n")
+endfunction()

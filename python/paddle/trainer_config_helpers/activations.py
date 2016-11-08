@@ -15,8 +15,10 @@
 __all__ = ["TanhActivation", "SigmoidActivation",
            "SoftmaxActivation", "IdentityActivation", "LinearActivation",
            'SequenceSoftmaxActivation', 'ExpActivation',
-           "ReluActivation", "BReluActivation", "SoftReluActivation", "STanhActivation",
-           "AbsActivation", "SquareActivation", "BaseActivation"]
+           "ReluActivation", "BReluActivation", "SoftReluActivation",
+           "STanhActivation",
+           "AbsActivation", "SquareActivation",
+           "BaseActivation"]
 
 
 class BaseActivation(object):
@@ -35,6 +37,9 @@ class BaseActivation(object):
     def __init__(self, name, support_hppl):
         self.name = name
         self.support_hppl = support_hppl
+
+    def __repr__(self):
+        return self.name
 
 
 class TanhActivation(BaseActivation):
@@ -194,3 +199,12 @@ class ExpActivation(BaseActivation):
        f(z) = e^z.
     """
     def __init__(self): BaseActivation.__init__(self, 'exponential', False)
+
+class LogActivation(BaseActivation):
+    """
+    Logarithm Activation.
+
+    .. math::
+       f(z) = log(z)
+    """
+    def __init__(self): BaseActivation.__init__(self, 'log', False)
