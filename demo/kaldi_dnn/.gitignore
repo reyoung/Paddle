@@ -1,0 +1,5 @@
+train.list
+test.list
+data
+train.log
+*.pyc
