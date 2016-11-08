@@ -2,8 +2,8 @@
 
 from paddle.trainer_config_helpers import *
 
-trn = 'data/train.list'
-tst = 'data/test.list'
+trn = 'train.list'
+tst = 'test.list'
 process = 'process'
 
 define_py_data_sources2(train_list=trn,
@@ -12,7 +12,7 @@ define_py_data_sources2(train_list=trn,
                         obj=process,
                         args={"num_senone" : 3513})
 
-batch_size = 256
+batch_size = 8192*8
 settings(
     batch_size=batch_size,
     learning_rate=2e-3,
