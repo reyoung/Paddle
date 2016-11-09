@@ -15,7 +15,7 @@ define_py_data_sources2(train_list=trn,
 batch_size = 8192*8
 settings(
     batch_size=batch_size,
-    learning_rate=2e-3,
+    learning_rate=5e-4,
     learning_method=AdamOptimizer(),
     regularization=L2Regularization(8e-4),
     gradient_clipping_threshold=25
@@ -24,9 +24,8 @@ settings(
 # Define the data for text features. The size of the data layer is the number
 # of words in the dictionary.
 data = data_layer(name="spliced_mfcc", size=484)
-hidden1 = fc_layer(input=data, size=1024, act=SigmoidActivation())
-hidden2 = fc_layer(input=hidden1, size=1024, act=SigmoidActivation())
-output = fc_layer(input=hidden2, size=3513, act=SoftmaxActivation())
+hidden1 = fc_layer(input=data, size=4096, layer_attr=ExtraAttr(drop_rate=0.5))
+output = fc_layer(input=hidden1, size=3513, act=SoftmaxActivation())
 
 # For training, we need label and cost
 
