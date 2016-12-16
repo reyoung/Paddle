@@ -17,7 +17,7 @@ if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
   make -j $NPROC
   for ((i=0;i<1000;i++))
   do
-    make test ARGS='-R RecurrentGradientMachine' 
+    make test ARGS='-R RecurrentGradientMachine -V' 
   done
 elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   return 0;
