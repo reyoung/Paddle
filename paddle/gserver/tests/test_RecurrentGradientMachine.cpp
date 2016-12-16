@@ -134,7 +134,6 @@ TEST(RecurrentGradientMachine, rnn) {
          "gserver/tests/sequence_nest_rnn.conf",
          1e-6,
          useGpu);
-    LOG(FATAL) << "here";
   }
 }
 
