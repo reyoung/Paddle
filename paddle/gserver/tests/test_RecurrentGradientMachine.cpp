@@ -19,6 +19,7 @@ limitations under the License. */
 #include <paddle/utils/PythonUtil.h>
 #include <paddle/utils/Util.h>
 #include <paddle/utils/Version.h>
+#include "backward.hpp"
 
 DECLARE_int32(seed);
 
@@ -118,7 +119,7 @@ void test(const string& conf1, const string& conf2, double eps, bool useGpu) {
   delete[] cost2;
 }
 
-TEST(RecurrentGradientMachine, HasSubSequence) {
+TEST(RecurrentGradientMachine, DISABLED_HasSubSequence) {
   for (bool useGpu : {false, true}) {
     test("gserver/tests/sequence_layer_group.conf",
          "gserver/tests/sequence_nest_layer_group.conf",
@@ -127,12 +128,13 @@ TEST(RecurrentGradientMachine, HasSubSequence) {
   }
 }
 
-TEST(RecurrentGradientMachine, DISABLED_rnn) {
+TEST(RecurrentGradientMachine, rnn) {
   for (bool useGpu : {false, true}) {
     test("gserver/tests/sequence_rnn.conf",
          "gserver/tests/sequence_nest_rnn.conf",
          1e-6,
          useGpu);
+    LOG(FATAL) << "here";
   }
 }
 
@@ -154,14 +156,22 @@ TEST(RecurrentGradientMachine, DISABLED_rnn_multi_unequalength_input) {
   }
 }
 
+static void on_failure() {
+  backward::StackTrace st;
+  st.load_here(512);
+  backward::Printer p;
+  p.print(st);
+  exit(1);
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
-
   if (paddle::version::isWithPyDataProvider()) {
     if (!paddle::version::isWithGpu()) {
       FLAGS_use_gpu = false;
     }
     initMain(argc, argv);
+    google::InstallFailureFunction(on_failure);
     initPython(argc, argv);
     return RUN_ALL_TESTS();
   } else {

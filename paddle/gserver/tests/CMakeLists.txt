@@ -92,6 +92,7 @@ endif()
 # TODO(yuyang18): There is some bug in test_RecurrentGradientMachine
 # I will fix it.
 add_unittest_without_exec(test_RecurrentGradientMachine
+    backward.cpp
     test_RecurrentGradientMachine.cpp)
 add_test(NAME test_RecurrentGradientMachine
     COMMAND .set_python_path.sh -d

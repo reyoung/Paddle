@@ -15,8 +15,12 @@ NPROC=1
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
   NRPOC=`nproc`
   make -j $NPROC
-  make coveralls
+  for ((i=0;i<1000;i++))
+  do
+    make test ARGS='-R RecurrentGradientMachine' 
+  done
 elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+  return 0;
   NPROC=`sysctl -n hw.ncpu`
   make -j $NPROC
   env CTEST_OUTPUT_ON_FAILURE=1 make test ARGS="-j $NPROC"
