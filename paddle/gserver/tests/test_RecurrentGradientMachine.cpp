@@ -119,7 +119,7 @@ void test(const string& conf1, const string& conf2, double eps, bool useGpu) {
   delete[] cost2;
 }
 
-TEST(RecurrentGradientMachine, DISABLED_HasSubSequence) {
+TEST(RecurrentGradientMachine, HasSubSequence) {
   for (bool useGpu : {false, true}) {
     test("gserver/tests/sequence_layer_group.conf",
          "gserver/tests/sequence_nest_layer_group.conf",
@@ -137,7 +137,7 @@ TEST(RecurrentGradientMachine, rnn) {
   }
 }
 
-TEST(RecurrentGradientMachine, DISABLED_rnn_multi_input) {
+TEST(RecurrentGradientMachine, rnn_multi_input) {
   for (bool useGpu : {false, true}) {
     test("gserver/tests/sequence_rnn_multi_input.conf",
          "gserver/tests/sequence_nest_rnn_multi_input.conf",
@@ -146,7 +146,7 @@ TEST(RecurrentGradientMachine, DISABLED_rnn_multi_input) {
   }
 }
 
-TEST(RecurrentGradientMachine, DISABLED_rnn_multi_unequalength_input) {
+TEST(RecurrentGradientMachine, rnn_multi_unequalength_input) {
   for (bool useGpu : {false, true}) {
     test("gserver/tests/sequence_rnn_multi_unequalength_inputs.py",
          "gserver/tests/sequence_nest_rnn_multi_unequalength_inputs.py",
