@@ -58,6 +58,7 @@ void TrainerInternal::init(const std::shared_ptr<TrainerConfigHelper>& config,
         << "Missing model_config in trainer_config";
     gradientMachine_.reset(
         GradientMachine::create(config_->getConfig().model_config(),
+                                config_->getTrainerCount(),
                                 intconfig_->mode,
                                 parameterUpdater_->getParameterTypes()));
   }

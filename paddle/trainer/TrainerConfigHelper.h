@@ -32,11 +32,8 @@ class DataConfig;
  *
  * The all operation to TrainerConfig object should use this object. It remove
  * many copy & paste code in trainer.
- *
- * @TODO(yuyang18): Make cmake check compiler support keyword 'final' or not.
- * Define a macro to unify 'final' keyword
  */
-class TrainerConfigHelper /*final*/ {
+class TrainerConfigHelper final {
 public:
   DISABLE_COPY(TrainerConfigHelper);
 
@@ -46,6 +43,9 @@ public:
    */
   explicit TrainerConfigHelper(const std::string& configFilePath);
   explicit TrainerConfigHelper(const TrainerConfig& config);
+
+  int32_t getTrainerCount() const;
+  void setTrainerCount(int32_t trainerCount);
 
   /**
    * Dtor

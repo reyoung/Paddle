@@ -95,7 +95,8 @@ void testGeneration(const string& configFile,
                     const string& expRetFile) {
   FLAGS_use_gpu = useGpu;
   auto config = std::make_shared<TrainerConfigHelper>(configFile);
-  unique_ptr<GradientMachine> gradientMachine(GradientMachine::create(*config));
+  unique_ptr<GradientMachine> gradientMachine(
+      GradientMachine::create(*config, FLAGS_trainer_count));
   gradientMachine->loadParameters(modelDir);
   vector<Argument> inArgs(2);
 

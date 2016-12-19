@@ -36,6 +36,9 @@ namespace paddle {
 
 struct TrainerConfigHelperPrivate {
   TrainerConfig conf;
+  int32_t trainerCount;
+
+  TrainerConfigHelperPrivate() : trainerCount(0) {}
 };
 
 TrainerConfigHelper::TrainerConfigHelper(const std::string &configFilePath)
@@ -60,6 +63,12 @@ TrainerConfigHelper::TrainerConfigHelper(const std::string &configFilePath)
 TrainerConfigHelper::TrainerConfigHelper(const TrainerConfig &config)
     : m(new TrainerConfigHelperPrivate()) {
   m->conf = config;
+}
+
+int32_t TrainerConfigHelper::getTrainerCount() const { return m->trainerCount; }
+
+void TrainerConfigHelper::setTrainerCount(int32_t trainerCount) {
+  m->trainerCount = trainerCount;
 }
 
 TrainerConfigHelper::~TrainerConfigHelper() {
@@ -187,7 +196,9 @@ std::shared_ptr<TrainerConfigHelper> TrainerConfigHelper::createFromFlags() {
   } else {
     return nullptr;
   }
-  return std::make_shared<TrainerConfigHelper>(configPath);
+  auto ptr = std::make_shared<TrainerConfigHelper>(configPath);
+  ptr->setTrainerCount(FLAGS_trainer_count);
+  return ptr;
 }
 
 std::shared_ptr<TrainerConfigHelper>

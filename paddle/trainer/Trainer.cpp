@@ -151,7 +151,7 @@ void Trainer::init(const std::shared_ptr<TrainerConfigHelper>& config,
   if (testing) {
     LOG(INFO) << "trainer: in testing mode";
     if (config_->getOptConfig().use_sparse_remote_updater() ||
-        FLAGS_trainer_count > 1) {
+        config->getTrainerCount() > 1) {
       mode_ = GradientMachine::kSgdSparseCpuTraining;
       LOG(INFO) << "trainer mode: SgdSparseCpuTraining";
     } else {
@@ -161,7 +161,7 @@ void Trainer::init(const std::shared_ptr<TrainerConfigHelper>& config,
   } else if (IGradientMachineMode::tryGetMode(
                  (int*)&mode_,
                  config_->getOptConfig().algorithm(),
-                 FLAGS_trainer_count,
+                 config_->getTrainerCount(),
                  FLAGS_local,
                  FLAGS_use_gpu)) {
     LOG(INFO) << "Custom trainer mode.";
@@ -196,7 +196,7 @@ void Trainer::init(const std::shared_ptr<TrainerConfigHelper>& config,
 
   bool gpuData =
       FLAGS_use_gpu && (!FLAGS_parallel_nn) &&
-      (!IGradientMachineMode::dataMustInCpu(mode_, FLAGS_trainer_count));
+      (!IGradientMachineMode::dataMustInCpu(mode_, config_->getTrainerCount()));
 
   dataProvider_ = dataProvider;
   if (!dataProvider_ && config_->hasDataConfig() && !testing_) {

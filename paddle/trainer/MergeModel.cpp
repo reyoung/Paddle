@@ -33,7 +33,8 @@ int main(int argc, char** argv) {
   FLAGS_use_gpu = false;
 #endif
   auto config = std::make_shared<TrainerConfigHelper>(confFile);
-  unique_ptr<GradientMachine> gradientMachine(GradientMachine::create(*config));
+  unique_ptr<GradientMachine> gradientMachine(
+      GradientMachine::create(*config, FLAGS_trainer_count));
   gradientMachine->loadParameters(FLAGS_model_dir);
 
   ofstream os(FLAGS_model_file);

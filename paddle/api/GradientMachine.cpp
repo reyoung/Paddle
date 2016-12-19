@@ -27,12 +27,14 @@ GradientMachine::~GradientMachine() { delete m; }
 
 GradientMachine* GradientMachine::createFromPaddleModelPtr(
     const void* confPtr,
+    int32_t trainerCount,
     GradientMatchineCreateMode mode,
     const std::vector<int>& types) {
   auto& conf = *(const paddle::ModelConfig*)(confPtr);
   std::vector<ParameterType> realTypes;
   staticCastVector(&realTypes, types);
-  auto machineRawPtr = paddle::GradientMachine::create(conf, mode, realTypes);
+  auto machineRawPtr =
+      paddle::GradientMachine::create(conf, trainerCount, mode, realTypes);
   auto machinePtr = std::shared_ptr<paddle::GradientMachine>(machineRawPtr);
   if (machinePtr != nullptr) {
     auto machine = new GradientMachine();
@@ -45,12 +47,14 @@ GradientMachine* GradientMachine::createFromPaddleModelPtr(
 
 GradientMachine* GradientMachine::createByConfigProtoStr(
     const std::string& protoStr,
+    int32_t trainerCount,
     GradientMatchineCreateMode mode,
     const std::vector<int>& types) {
   paddle::ModelConfig conf;
   conf.ParseFromString(protoStr);
   if (conf.IsInitialized()) {
-    return GradientMachine::createFromPaddleModelPtr(&conf, mode, types);
+    return GradientMachine::createFromPaddleModelPtr(
+        &conf, trainerCount, mode, types);
   } else {
     return nullptr;
   }
@@ -58,10 +62,12 @@ GradientMachine* GradientMachine::createByConfigProtoStr(
 
 GradientMachine* GradientMachine::createByModelConfig(
     ModelConfig* conf,
+    int32_t trainerCount,
     GradientMatchineCreateMode mode,
     const std::vector<int>& types) {
   auto confPtr = &conf->m->conf->getModelConfig();
-  return GradientMachine::createFromPaddleModelPtr(confPtr, mode, types);
+  return GradientMachine::createFromPaddleModelPtr(
+      confPtr, trainerCount, mode, types);
 }
 
 void GradientMachine::forward(const Arguments& inArgs,

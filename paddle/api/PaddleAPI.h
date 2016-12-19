@@ -700,6 +700,7 @@ public:
    */
   static GradientMachine* createByConfigProtoStr(
       const std::string& protoStr,
+      int32_t trainerCount = 1,
       GradientMatchineCreateMode mode = CREATE_MODE_NORMAL,
       const std::vector<int>& parameterTypes = defaultParamTypes);
 
@@ -711,6 +712,7 @@ public:
    */
   static GradientMachine* createByModelConfig(
       ModelConfig* conf,
+      int32_t trainerCount = 1,
       GradientMatchineCreateMode mode = CREATE_MODE_NORMAL,
       const std::vector<int>& parameterTypes = defaultParamTypes);
 
@@ -766,6 +768,7 @@ private:
 
   static GradientMachine* createFromPaddleModelPtr(
       const void* confPtr,
+      int32_t trainerCount,
       GradientMatchineCreateMode mode,
       const std::vector<int>& types);
 
