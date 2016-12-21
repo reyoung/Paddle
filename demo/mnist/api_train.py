@@ -1,6 +1,24 @@
 import py_paddle.swig_paddle as api
-import paddle.trainer.config_parser
 import numpy as np
+
+import paddle.trainer_config_helpers.config_parser as config_parser
+from paddle.trainer_config_helpers import *
+
+
+def optimizer_config():
+    settings(
+        learning_rate=1e-4, learning_method=AdamOptimizer(), batch_size=1000)
+
+
+def network_config():
+    imgs = data_layer(name='pixel', size=784)
+    hidden1 = fc_layer(input=imgs, size=200)
+    hidden2 = fc_layer(input=hidden1, size=200)
+    inference = fc_layer(input=hidden2, size=10, act=SoftmaxActivation())
+    cost = classification_cost(
+        input=inference, label=data_layer(
+            name='label', size=10))
+    outputs(cost)
 
 
 def init_parameter(network):
@@ -15,15 +33,15 @@ def init_parameter(network):
 
 def main():
     api.initPaddle("-use_gpu=false", "-trainer_count=4")  # use 4 cpu cores
-    config = paddle.trainer.config_parser.parse_config(
-        'simple_mnist_network.py', '')
 
-    opt_config = api.OptimizationConfig.createFromProto(config.opt_config)
+    opt_config_proto = config_parser.parse_optimizer_config(optimizer_config)
+    opt_config = api.OptimizationConfig.createFromProto(opt_config_proto)
     _temp_optimizer_ = api.ParameterOptimizer.create(opt_config)
     enable_types = _temp_optimizer_.getParameterTypes()
 
+    model_config = config_parser.parse_network_config(network_config)
     m = api.GradientMachine.createFromConfigProto(
-        config.model_config, api.CREATE_MODE_NORMAL, enable_types)
+        model_config, api.CREATE_MODE_NORMAL, enable_types)
     assert isinstance(m, api.GradientMachine)
     init_parameter(network=m)
 
