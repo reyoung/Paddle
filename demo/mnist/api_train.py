@@ -9,7 +9,6 @@ The user api could be simpler and carefully designed.
 import py_paddle.swig_paddle as api
 from py_paddle import DataProviderConverter
 import paddle.trainer.PyDataProvider2 as dp
-import paddle.trainer.config_parser
 import numpy as np
 import random
 from mnist_util import read_from_mnist
