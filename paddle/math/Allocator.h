@@ -31,7 +31,7 @@ public:
   virtual ~Allocator() {}
   virtual void* alloc(size_t size) = 0;
   virtual void free(void* ptr) = 0;
-  virtual std::string getName() = 0;
+  //  virtual std::string getName() = 0;
 };
 
 /**
@@ -39,14 +39,12 @@ public:
  */
 class CpuAllocator : public Allocator {
 public:
-  ~CpuAllocator() {}
-
   /**
    * @brief Aligned allocation on CPU.
    * @param size Size to be allocated.
    * @return Pointer to the allocated memory
    */
-  virtual void* alloc(size_t size) {
+  void* alloc(size_t size) override {
     void* ptr;
     CHECK_EQ(posix_memalign(&ptr, 32ul, size), 0);
     CHECK(ptr) << "Fail to allocate CPU memory: size=" << size;
@@ -57,13 +55,7 @@ public:
    * @brief Free the memory space.
    * @param ptr  Pointer to be free.
    */
-  virtual void free(void* ptr) {
-    if (ptr) {
-      ::free(ptr);
-    }
-  }
-
-  virtual std::string getName() { return "cpu_alloc"; }
+  void free(void* ptr) override { ::free(ptr); }
 };
 
 /**
@@ -71,14 +63,12 @@ public:
  */
 class GpuAllocator : public Allocator {
 public:
-  ~GpuAllocator() {}
-
   /**
    * @brief Allocate GPU memory.
    * @param size Size to be allocated.
    * @return Pointer to the allocated memory
    */
-  virtual void* alloc(size_t size) {
+  void* alloc(size_t size) override {
     void* ptr = hl_malloc_device(size);
     CHECK(ptr) << "Fail to allocate GPU memory " << size << " bytes";
     return ptr;
@@ -88,13 +78,7 @@ public:
    * @brief Free the GPU memory.
    * @param ptr  Pointer to be free.
    */
-  virtual void free(void* ptr) {
-    if (ptr) {
-      hl_free_mem_device(ptr);
-    }
-  }
-
-  virtual std::string getName() { return "gpu_alloc"; }
+  void free(void* ptr) override { hl_free_mem_device(ptr); }
 };
 
 /**
@@ -102,14 +86,12 @@ public:
  */
 class CudaHostAllocator : public Allocator {
 public:
-  ~CudaHostAllocator() {}
-
   /**
    * @brief Allocate pinned memory.
    * @param size Size to be allocated.
    * @return Pointer to the allocated memory
    */
-  virtual void* alloc(size_t size) {
+  void* alloc(size_t size) override {
     void* ptr = hl_malloc_host(size);
     CHECK(ptr) << "Fail to allocate pinned memory " << size << " bytes";
     return ptr;
@@ -119,13 +101,7 @@ public:
    * @brief Free the pinned memory.
    * @param ptr  Pointer to be free.
    */
-  virtual void free(void* ptr) {
-    if (ptr) {
-      hl_free_mem_host(ptr);
-    }
-  }
-
-  virtual std::string getName() { return "cuda_host_alloc"; }
+  void free(void* ptr) override { hl_free_mem_host(ptr); }
 };
 
 }  // namespace paddle
