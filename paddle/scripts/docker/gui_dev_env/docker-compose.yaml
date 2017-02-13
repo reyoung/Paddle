@@ -1,0 +1,9 @@
+version: '2'
+services:
+  gui_dev:
+    build:
+      context: ../../../../
+      dockerfile: ./paddle/scripts/docker/gui_dev_env/Dockerfile 
+      args:
+        UBUNTU_MIRROR: "http://cn.archive.ubuntu.com/ubuntu"
+        BUILD_AND_INSTALL: "ON" 
