@@ -16,7 +16,7 @@ imikolov's simple dataset: http://www.fit.vutbr.cz/~imikolov/rnnlm/
 
 Complete comments.
 """
-import paddle.v2.dataset.common
+from common import download
 import collections
 import tarfile
 import functools
@@ -40,9 +40,14 @@ def word_count(f, word_freq=None):
     return word_freq
 
 
+def fetch():
+    return download(URL, "imikolov", MD5)
+
+
 def open_file(filename):
     tf = tarfile.open(fetch())
-    return tf.extractfile(filename)
+    f = tf.extractfile(filename)
+    return f
 
 
 __train_file__ = './simple-examples/data/ptb.train.txt'
@@ -50,40 +55,40 @@ __test_file__ = './simple-examples/data/ptb.valid.txt'
 
 
 def build_dict():
-    with open_file(__train_file__) as trainf, open_file(__test_file__) as testf:
-        word_freq = word_count(testf, word_count(trainf))
-        if '<unk>' in word_freq:
-            # remove <unk> for now, since we will set it as last index
-            del word_freq['<unk>']
+    trainf = open_file(__train_file__)
+    testf = open_file(__test_file__)
+    word_freq = word_count(testf, word_count(trainf))
+    if '<unk>' in word_freq:
+        # remove <unk> for now, since we will set it as last index
+        del word_freq['<unk>']
 
-        TYPO_FREQ = 50
-        word_freq = filter(lambda x: x[1] > TYPO_FREQ, word_freq.items())
+    TYPO_FREQ = 50
+    word_freq = filter(lambda x: x[1] > TYPO_FREQ, word_freq.items())
+    word_freq_sorted = sorted(word_freq, key=lambda x: (-x[1], x[0]))
+    words, _ = list(zip(*word_freq_sorted))
+    word_idx = dict(zip(words, xrange(len(words))))
+    word_idx['<unk>'] = len(words)
 
-        word_freq_sorted = sorted(word_freq, key=lambda x: (-x[1], x[0]))
-        words, _ = list(zip(*word_freq_sorted))
-        word_idx = dict(zip(words, xrange(len(words))))
-        word_idx['<unk>'] = len(words)
+    trainf.close()
+    testf.close()
 
     return word_idx
 
 
 def reader_creator(word_idx, n, filename):
     def reader():
-        with open_file(filename) as f:
-            UNK = word_idx['<unk>']
-            for l in f:
-                l = ['<s>'] + l.strip().split() + ['<e>']
-                if len(l) >= n:
-                    l = [word_idx.get(w, UNK) for w in l]
-                    for i in range(n, len(l) + 1):
-                        yield tuple(l[i - n:i])
+        f = open_file(filename)
+        UNK = word_idx['<unk>']
+        for l in f:
+            l = ['<s>'] + l.strip().split() + ['<e>']
+            if len(l) >= n:
+                l = [word_idx.get(w, UNK) for w in l]
+                for i in xrange(n, len(l) + 1):
+                    yield l[i - n:i]
+        f.close()
 
     return reader
 
 
 train = functools.partial(reader_creator, filename=__train_file__)
 test = functools.partial(reader_creator, filename=__test_file__)
-
-
-def fetch():
-    return paddle.v2.dataset.common.download(URL, "imikolov", MD5)
