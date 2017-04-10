@@ -19,6 +19,7 @@ Complete comments.
 import paddle.v2.dataset.common
 import collections
 import tarfile
+import functools
 
 __all__ = ['train', 'test', 'build_dict']
 
@@ -39,15 +40,17 @@ def word_count(f, word_freq=None):
     return word_freq
 
 
+def open_file(filename):
+    tf = tarfile.open(fetch())
+    return tf.extractfile(filename)
+
+
+__train_file__ = './simple-examples/data/ptb.train.txt'
+__test_file__ = './simple-examples/data/ptb.valid.txt'
+
+
 def build_dict():
-    train_filename = './simple-examples/data/ptb.train.txt'
-    test_filename = './simple-examples/data/ptb.valid.txt'
-    with tarfile.open(
-            paddle.v2.dataset.common.download(
-                paddle.v2.dataset.imikolov.URL, 'imikolov',
-                paddle.v2.dataset.imikolov.MD5)) as tf:
-        trainf = tf.extractfile(train_filename)
-        testf = tf.extractfile(test_filename)
+    with open_file(__train_file__) as trainf, open_file(__test_file__) as testf:
         word_freq = word_count(testf, word_count(trainf))
         if '<unk>' in word_freq:
             # remove <unk> for now, since we will set it as last index
@@ -64,14 +67,9 @@ def build_dict():
     return word_idx
 
 
-def reader_creator(filename, word_idx, n):
+def reader_creator(word_idx, n, filename):
     def reader():
-        with tarfile.open(
-                paddle.v2.dataset.common.download(
-                    paddle.v2.dataset.imikolov.URL, 'imikolov',
-                    paddle.v2.dataset.imikolov.MD5)) as tf:
-            f = tf.extractfile(filename)
-
+        with open_file(filename) as f:
             UNK = word_idx['<unk>']
             for l in f:
                 l = ['<s>'] + l.strip().split() + ['<e>']
@@ -83,13 +81,9 @@ def reader_creator(filename, word_idx, n):
     return reader
 
 
-def train(word_idx, n):
-    return reader_creator('./simple-examples/data/ptb.train.txt', word_idx, n)
-
-
-def test(word_idx, n):
-    return reader_creator('./simple-examples/data/ptb.valid.txt', word_idx, n)
+train = functools.partial(reader_creator, filename=__train_file__)
+test = functools.partial(reader_creator, filename=__test_file__)
 
 
 def fetch():
-    paddle.v2.dataset.common.download(URL, "imikolov", MD5)
+    return paddle.v2.dataset.common.download(URL, "imikolov", MD5)
