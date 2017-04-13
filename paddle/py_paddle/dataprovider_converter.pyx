@@ -17,10 +17,75 @@ import collections
 import swig_paddle
 import numpy
 import itertools
-from iscanner import IScanner
-from scanners import IndexScanner
+import threading
 
 __all__ = ['DataProviderConverter']
+
+
+class IScanner(object):
+    """
+    The scanner will scan Python object two passes, then convert it to Paddle's
+    argument.
+
+    In the first pass, `pre_scan` will be invoked by every data instance, and
+    then invoke `finish_pre_scan` to arguments. And the second pass do the same
+    thing except the functions changed to `scan`, `finish_scan`.
+
+    During the first pass, a scanner may count the shape of input matrix and
+    allocate memory for this argument. Then fill the data into this  argument
+    in second pass.
+    """
+
+    def __init__(self, input_type, pos):
+        self.input_type = input_type
+        if not isinstance(self.input_type, dp2.InputType):
+            raise ValueError("input type should be dataprovider2.InputType")
+        self.pos = pos
+        # data_in_gpu is used to indicate whether to create argument on GPU
+        # or not in GPU mode. Now if using one thread (trainer_count=1),
+        # trainer uses NeuralNetwork which needs to create argument on GPU
+        # before calling forward function. So, set data_in_gpu to True.
+        # Otherwise, trainer uses MultiGradientMachine which will transfer
+        # data from CPU to GPU in the forward function, set data_in_gpu to
+        # False in this case.
+        self.data_in_gpu = swig_paddle.isUsingGpu(
+        ) and swig_paddle.getTrainerCount() == 1
+
+    def pre_scan(self, dat):
+        """
+        First pass scan method. During this method, the scanner could count the
+        data number, and get the total memory size this batch would use.
+
+        :param dat: The python object.
+        """
+        pass
+
+    def finish_pre_scan(self, argument):
+        """
+        Finish first scan pass. Allocate the memory.
+
+        :param argument: Output arguments object.
+        :type argument: swig_paddle.Arguments
+        :return:
+        """
+        pass
+
+    def scan(self, dat):
+        """
+        Second pass scan method. Copy the data to arguments.
+
+        :param dat: The python object.
+        """
+        pass
+
+    def finish_scan(self, argument):
+        """
+        Finish second pass. Finalize the resources, etc.
+
+        :param argument: Output arguments object.
+        :type argument: swig_paddle.Arguments
+        """
+        pass
 
 
 class DenseScanner(IScanner):
@@ -91,6 +156,30 @@ class SparseFloatScanner(SparseBinaryScanner):
     def extend_cols(self, dat):
         self.__cols__.extend((x[0] for x in dat))
         self.__value__.extend((x[1] for x in dat))
+
+
+class IndexScanner(IScanner):
+    local = threading.local()
+
+    def __init__(self, input_type, pos):
+        IScanner.__init__(self, input_type, pos)
+        if getattr(IndexScanner.local, '__ids__', None) is None:
+            IndexScanner.local.__ids__ = [0] * 1024  # 1024 int buffer
+        self.__idx__ = 0
+
+    def scan(self, dat):
+        try:
+            IndexScanner.local.__ids__[self.__idx__] = dat
+        except:
+            IndexScanner.local.__ids__ *= 2
+            IndexScanner.local.__ids__[self.__idx__] = dat
+        self.__idx__ += 1
+
+    def finish_scan(self, argument):
+        ids = swig_paddle.IVector.create(
+            IndexScanner.local.__ids__[:self.__idx__], self.data_in_gpu)
+        assert isinstance(argument, swig_paddle.Arguments)
+        argument.setSlotIds(self.pos, ids)
 
 
 class SequenceScanner(IScanner):
