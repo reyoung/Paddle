@@ -17,6 +17,7 @@ import collections
 import swig_paddle
 import numpy
 import itertools
+import threading
 
 __all__ = ['DataProviderConverter']
 
@@ -158,24 +159,24 @@ class SparseFloatScanner(SparseBinaryScanner):
 
 
 class IndexScanner(IScanner):
+    local = threading.local()
+
     def __init__(self, input_type, pos):
         IScanner.__init__(self, input_type, pos)
-        self.__ids__ = None
-        self.__idx__ = 0
-
-    def pre_scan(self, dat):
-        self.__idx__ += 1
-
-    def finish_pre_scan(self, argument):
-        self.__ids__ = [0] * self.__idx__
+        if getattr(IndexScanner.local, '__ids__', None) is None:
+            IndexScanner.local.__ids__ = [0] * 1024  # 1024 int buffer
         self.__idx__ = 0
 
     def scan(self, dat):
-        self.__ids__[self.__idx__] = dat
+        if self.__idx__ < len(IndexScanner.local.__ids__):
+            IndexScanner.local.__ids__[self.__idx__] = dat
+        else:
+            IndexScanner.local.__ids__.append(dat)
         self.__idx__ += 1
 
     def finish_scan(self, argument):
-        ids = swig_paddle.IVector.create(self.__ids__, self.data_in_gpu)
+        ids = swig_paddle.IVector.create(
+            IndexScanner.local.__ids__[:self.__idx__], self.data_in_gpu)
         assert isinstance(argument, swig_paddle.Arguments)
         argument.setSlotIds(self.pos, ids)
 

@@ -4840,7 +4840,7 @@ def crf_decoding_layer(input,
 
 @wrap_act_default(act=SigmoidActivation())
 @wrap_bias_attr_default(has_bias=True)
-@wrap_param_default()
+@wrap_param_default(param_names=['param_attr'])
 @wrap_name_default()
 @layer_support()
 def nce_layer(input,
