@@ -168,10 +168,11 @@ class IndexScanner(IScanner):
         self.__idx__ = 0
 
     def scan(self, dat):
-        if self.__idx__ < len(IndexScanner.local.__ids__):
+        try:
             IndexScanner.local.__ids__[self.__idx__] = dat
-        else:
-            IndexScanner.local.__ids__.append(dat)
+        except:
+            IndexScanner.local.__ids__ *= 2
+            IndexScanner.local.__ids__[self.__idx__] = dat
         self.__idx__ += 1
 
     def finish_scan(self, argument):
