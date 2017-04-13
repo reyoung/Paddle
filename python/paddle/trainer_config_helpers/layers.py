@@ -2284,7 +2284,7 @@ def img_pool_layer(input,
 
     type_name = pool_type.name + '-projection' \
         if (
-    isinstance(pool_type, AvgPooling) or isinstance(pool_type, MaxPooling)) \
+        isinstance(pool_type, AvgPooling) or isinstance(pool_type, MaxPooling)) \
         else pool_type.name
 
     pool_size_y = pool_size if pool_size_y is None else pool_size_y
@@ -4840,6 +4840,7 @@ def crf_decoding_layer(input,
 
 @wrap_act_default(act=SigmoidActivation())
 @wrap_bias_attr_default(has_bias=True)
+@wrap_param_default()
 @wrap_name_default()
 @layer_support()
 def nce_layer(input,
@@ -4850,6 +4851,7 @@ def nce_layer(input,
               num_neg_samples=10,
               neg_distribution=None,
               name=None,
+              param_attr=None,
               bias_attr=None,
               layer_attr=None):
     """
@@ -4903,10 +4905,15 @@ def nce_layer(input,
 
     ipts_for_layer = []
     parents = []
-    for each_input in input:
+    if not isinstance(param_attr, collections.Sequence):
+        param_attr = [param_attr]
+
+    for i, each_input in enumerate(input):
+        i %= len(param_attr)
         assert isinstance(each_input, LayerOutput)
-        ipts_for_layer.append(each_input.name)
+        ipts_for_layer.append(Input(each_input.name, **param_attr[i].attr))
         parents.append(each_input)
+
     ipts_for_layer.append(label.name)
     parents.append(label)
 
