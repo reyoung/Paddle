@@ -21,6 +21,11 @@ if [[ ${WITH_GPU:-OFF} == 'ON' ]]; then
     DOCKERFILE_CUDNN_DSO="RUN ln -s /usr/lib/x86_64-linux-gnu/libcudnn.so.5 /usr/lib/x86_64-linux-gnu/libcudnn.so"
 fi
 
+if [[ ${PROXY:-OFF} != 'OFF' ]];then
+    export http_proxy=${PROXY}
+    export https_proxy=${PROXY}
+fi
+
 mkdir -p /paddle/build
 cd /paddle/build
 
