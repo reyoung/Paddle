@@ -16,21 +16,29 @@ int main() {
   // Create a gradient machine for inference.
   paddle_gradient_machine machine;
   CHECK(paddle_gradient_machine_create_for_inference(&machine, buf, (int)size));
-  CHECK(paddle_gradient_machine_randomize_param(machine));
 
+  // CHECK(paddle_gradient_machine_randomize_param(machine));
   // Loading parameter. Uncomment the following line and change the directory.
-  // CHECK(paddle_gradient_machine_load_parameter_from_disk(machine,
-  //                                                "./some_where_to_params"));
+  CHECK(paddle_gradient_machine_load_parameter_from_disk(
+      machine,
+      "/Users/baidu/Downloads/.tmp/paddle_predict.for_yuyang/"
+      "LOOKALIKE_DNA_120000262/model"));
   paddle_arguments in_args = paddle_arguments_create_none();
 
   // There is only one input of this network.
   CHECK(paddle_arguments_resize(in_args, 1));
 
   // Create input matrix.
-  paddle_matrix mat = paddle_matrix_create_sparse(1, 784, 3, true, false);
+  paddle_matrix mat = paddle_matrix_create_sparse(1, 500001, 3, true, false);
   srand(time(0));
   paddle_real* array;
-  int colBuf[] = {9, 93, 109};
+  int colBuf[] = {8,      9,      10,     11,     12,    14,    17,    18,
+                  20,     21,     23,     24,     31,    35,    41,    48,
+                  59,     70,     71,     74,     78,    91,    103,   107,
+                  129,    145,    158,    162,    177,   179,   181,   185,
+                  193,    194,    200,    295,    327,   328,   363,   365,
+                  623,    1323,   1464,   2292,   2296,  43372, 72345, 77372,
+                  129466, 173570, 267414, 325350, 325406};
   int rowBuf[] = {0, sizeof(colBuf) / sizeof(int)};
 
   CHECK(paddle_matrix_sparse_copy_from(mat,
@@ -55,7 +63,7 @@ int main() {
   CHECK(paddle_matrix_get_row(prob, 0, &array));
 
   printf("Prob: ");
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < 2; ++i) {
     printf("%.2f ", array[i]);
   }
   printf("\n");
