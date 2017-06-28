@@ -74,7 +74,6 @@ class HookAttribute(object):
     :param sparsity_ratio: Must be specified if hook type is 'pruning', 
                         it represents the ratio of the zero elements to be set by the Parameter.
     :type sparsity_ratio: float or None
-	
     """
 
     def __init__(self, type, sparsity_ratio=None):
@@ -149,6 +148,7 @@ class ParameterAttribute(object):
                  momentum=None,
                  gradient_clipping_threshold=None,
                  sparse_update=False,
+                 sparse_remote_update=None,
                  update_hooks=None,
                  initializer=None):
         self.attr = {}
@@ -196,7 +196,10 @@ class ParameterAttribute(object):
 
         if sparse_update:
             self.attr['sparse_update'] = True
-            self.attr['sparse_remote_update'] = True
+            if sparse_remote_update is None:
+                self.attr['sparse_remote_update'] = True
+            else:
+                self.attr['sparse_remote_update'] = bool(sparse_remote_update)
 
         if gradient_clipping_threshold is not None and \
                 is_compatible_with(gradient_clipping_threshold, float):
