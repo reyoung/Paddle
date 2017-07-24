@@ -141,7 +141,7 @@ All parameter, weight, gradient are variables in Paddle.
   ExposeOperator(operator_base);
 
   using PlainNetPtr = std::shared_ptr<pd::PlainNet>;
-  py::class_<pd::PlainNet, PlainNetPtr> plain_net(m, "PlainNet");
+  py::class_<pd::PlainNet, PlainNetPtr> plain_net(m, "Net");
 
   plain_net
       .def_static("create",
