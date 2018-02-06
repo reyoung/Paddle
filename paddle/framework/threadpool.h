@@ -95,7 +95,7 @@ class ThreadPool {
       if (ex != nullptr) {
         LOG(FATAL) << "The exception is thrown inside the thread pool. You "
                       "should use RunAndGetException to handle the exception.\n"
-                      "The default exception handler is LOG(FATAL)."
+                      "The default exception handler is LOG(FATAL).\n"
                    << ex->what();
       }
     }
