@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "paddle/platform/place.h"
+#include "paddle/platform/gpu_info.h"
 
 namespace paddle {
 namespace platform {
@@ -75,14 +76,14 @@ CUDAPlaceGuard::CUDAPlaceGuard(const CUDAPlace place) {
   PADDLE_THROW(
       "Should not invoke CUDAPlaceGuard when paddle is not compiled with CUDA");
 #else
-  cudaGetDevice(&dev_id_);
-  cudaSetDevice(place.device);
+  this->dev_id_ = GetCurrentDeviceId();
+  SetDeviceId(place.device);
 #endif
 }
 
 CUDAPlaceGuard::~CUDAPlaceGuard() {
 #ifdef PADDLE_WITH_CUDA
-  cudaSetDevice(this->dev_id_);
+  SetDeviceId(this->dev_id_);
 #endif
 }
 

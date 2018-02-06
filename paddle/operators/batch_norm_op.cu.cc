@@ -18,6 +18,7 @@ limitations under the License. */
 #include <cfloat>
 #include "paddle/operators/math/math_function.h"
 #include "paddle/platform/cudnn_helper.h"
+#include "paddle/platform/gpu_info.h"
 
 namespace paddle {
 namespace operators {
@@ -52,6 +53,7 @@ class BatchNormKernel<platform::CUDADeviceContext, T>
     : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext &ctx) const override {
+    VLOG(3) << platform::GetCurrentDeviceId() << ", " << ctx.GetPlace();
     PADDLE_ENFORCE(platform::is_gpu_place(ctx.GetPlace()),
                    "It must use CUDAPlace.");
     double epsilon = static_cast<double>(ctx.Attr<float>("epsilon"));
