@@ -350,7 +350,7 @@ class ParallelDoGradOpShapeInference : public framework::InferShapeBase {
     std::vector<std::string> output{kOutputs};
 
     PADDLE_ENFORCE(ctx->HasInputs(kParameters));
-    PADDLE_ENFORCE(ctx->HasOutputs(framework::GradVarName(kParameters)));
+    //    PADDLE_ENFORCE(ctx->HasOutputs(framework::GradVarName(kParameters)));
     PADDLE_ENFORCE(ctx->HasInputs(kInputs));
 
     for (auto &s : output) {
@@ -372,10 +372,15 @@ class ParallelDoGradOpShapeInference : public framework::InferShapeBase {
       ctx->SetDims({ig_name}, {i_dims[i]});
     }
 
-    if (ctx->HasInputs(kParameters)) {
-      PADDLE_ENFORCE(ctx->HasOutputs(framework::GradVarName(kParameters)));
-      ctx->SetOutputsDim(framework::GradVarName(kParameters),
-                         ctx->GetInputsDim(kParameters));
+    auto p_dims = ctx->GetInputsDim(kParameters);
+    auto pg_names = ctx->Outputs(framework::GradVarName(kParameters));
+    for (size_t i = 0; i < pg_names.size(); ++i) {
+      auto &pg_name = pg_names[i];
+      if (pg_name == framework::kEmptyVarName) {
+        continue;
+      }
+
+      ctx->SetDims({pg_name}, {p_dims[i]});
     }
   }
 };
