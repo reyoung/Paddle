@@ -75,7 +75,7 @@ CUDAPlaceGuard::CUDAPlaceGuard(const CUDAPlace place) {
   PADDLE_THROW(
       "Should not invoke CUDAPlaceGuard when paddle is not compiled with CUDA");
 #else
-  this->dev_id_ = cudaGetDevice();
+  cudaGetDevice(&dev_id_);
   cudaSetDevice(place.device);
 #endif
 }
