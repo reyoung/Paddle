@@ -143,6 +143,7 @@ class ParallelDoOp : public framework::OperatorBase {
     for (auto &param : Inputs(kParameters)) {
       PADDLE_ENFORCE(scope.FindVar(param)->IsType<LoDTensor>(),
                      "Only support parameter type as LoDTensor");
+      VLOG(3) << "Coping " << param;
       auto &src = scope.FindVar(param)->Get<LoDTensor>();
       for (size_t i = 0; i < sub_scopes.size(); ++i) {
         auto &place = places[i];
