@@ -158,13 +158,9 @@ class ParallelDoOp : public framework::OperatorBase {
       auto *cur_scope = sub_scopes[place_idx];
 
       workers.emplace_back(framework::Async([program, cur_scope, place, block] {
-        try {
-          framework::Executor executor(place);
-          executor.Run(*program, cur_scope, block->ID(),
-                       false /*create_local_scope*/);
-        } catch (...) {
-          VLOG(10) << "Exception!";
-        }
+        framework::Executor executor(place);
+        executor.Run(*program, cur_scope, block->ID(),
+                     false /*create_local_scope*/);
       }));
     }
     for (auto &worker : workers) {
