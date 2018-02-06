@@ -69,5 +69,22 @@ std::ostream &operator<<(std::ostream &os, const Place &p) {
   return os;
 }
 
+CUDAPlaceGuard::CUDAPlaceGuard(const CUDAPlace place) {
+  (void)(this->dev_id_);  // ignore gcc unused warning in CPU
+#ifndef PADDLE_WITH_CUDA
+  PADDLE_THROW(
+      "Should not invoke CUDAPlaceGuard when paddle is not compiled with CUDA");
+#else
+  this->dev_id_ = cudaGetDevice();
+  cudaSetDevice(place.device);
+#endif
+}
+
+CUDAPlaceGuard::~CUDAPlaceGuard() {
+#ifdef PADDLE_WITH_CUDA
+  cudaSetDevice(this->dev_id_);
+#endif
+}
+
 }  // namespace platform
 }  // namespace paddle

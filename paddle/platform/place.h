@@ -60,6 +60,15 @@ const Place &get_place();
 const CUDAPlace default_gpu();
 const CPUPlace default_cpu();
 
+class CUDAPlaceGuard {
+ public:
+  explicit CUDAPlaceGuard(const CUDAPlace place);
+  ~CUDAPlaceGuard();
+
+ private:
+  int dev_id_;
+};
+
 bool is_gpu_place(const Place &);
 bool is_cpu_place(const Place &);
 bool places_are_same_class(const Place &, const Place &);

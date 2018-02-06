@@ -232,6 +232,12 @@ class ParallelDoGradOp : public framework::OperatorBase {
 
       // execute
       workers.emplace_back(framework::Async([program, cur_scope, place, block] {
+        std::unique_ptr<platform::CUDAPlaceGuard> guard;
+        if (platform::is_gpu_place(place)) {
+          guard.reset(new platform::CUDAPlaceGuard(
+              boost::get<platform::CUDAPlace>(place)));
+        }
+
         framework::Executor executor(place);
         executor.Run(*program, cur_scope, block->ID(),
                      false /*create_local_scope*/);
