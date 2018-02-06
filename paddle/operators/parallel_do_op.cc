@@ -173,7 +173,7 @@ class ParallelDoOp : public framework::OperatorBase {
       for (auto *sub_scope : sub_scopes) {
         lod_tensors.emplace_back(&sub_scope->FindVar(o_name)->Get<LoDTensor>());
       }
-
+      VLOG(3) << "Merge output gradient (" << o_name << ")";
       auto *lod_tensor_to_be_merged =
           scope.FindVar(o_name)->GetMutable<LoDTensor>();
       lod_tensor_to_be_merged->MergeLoDTensor(lod_tensors, dev_ctx.GetPlace());
