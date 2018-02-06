@@ -54,13 +54,15 @@ inline const char* cudnnGetErrorString(cudnnStatus_t status) {
 #define CUDNN_VERSION_MIN(major, minor, patch) \
   (CUDNN_VERSION >= ((major)*1000 + (minor)*100 + (patch)))
 
-#define CUDNN_ENFORCE(condition)                                   \
-  do {                                                             \
-    cudnnStatus_t status = condition;                              \
-    if (status != CUDNN_STATUS_SUCCESS) {                          \
-      PADDLE_THROW("cuDNN call failed, reason: %s",                \
-                   paddle::platform::cudnnGetErrorString(status)); \
-    }                                                              \
+#define CUDNN_ENFORCE(condition)                                              \
+  do {                                                                        \
+    cudnnStatus_t status = condition;                                         \
+    if (status != CUDNN_STATUS_SUCCESS) {                                     \
+      PADDLE_THROW(                                                           \
+          "cuDNN call failed, reason: %s\n"                                   \
+          "File %s:%d",                                                       \
+          paddle::platform::cudnnGetErrorString(status), __FILE__, __LINE__); \
+    }                                                                         \
   } while (false)
 
 enum class DataLayout {  // Not use
