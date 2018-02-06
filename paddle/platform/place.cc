@@ -70,7 +70,7 @@ std::ostream &operator<<(std::ostream &os, const Place &p) {
   return os;
 }
 
-CUDAPlaceGuard::CUDAPlaceGuard(const CUDAPlace place) {
+CUDAPlaceGuard::CUDAPlaceGuard(CUDAPlace place) {
   (void)(this->dev_id_);  // ignore gcc unused warning in CPU
 #ifndef PADDLE_WITH_CUDA
   PADDLE_THROW(

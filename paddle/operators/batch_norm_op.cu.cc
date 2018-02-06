@@ -118,6 +118,14 @@ class BatchNormKernel<platform::CUDADeviceContext, T>
     auto *saved_mean = ctx.Output<Tensor>("SavedMean");
     auto *saved_variance = ctx.Output<Tensor>("SavedVariance");
 
+    VLOG(10) << "scale place=" << scale->place() << "\n"
+             << "bias place=" << bias->place() << "\n"
+             << "y place=" << y->place() << "\n"
+             << "mean_out place=" << mean_out->place() << "\n"
+             << "variance_out place=" << variance_out->place() << "\n"
+             << "saved_mean place=" << saved_mean->place() << "\n"
+             << "saved_variance place=" << saved_variance->place();
+
     // alloc memory
     y->mutable_data<T>(ctx.GetPlace());
     mean_out->mutable_data<T>(ctx.GetPlace());

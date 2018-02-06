@@ -62,7 +62,7 @@ const CPUPlace default_cpu();
 
 class CUDAPlaceGuard {
  public:
-  explicit CUDAPlaceGuard(const CUDAPlace place);
+  explicit CUDAPlaceGuard(CUDAPlace place);
   ~CUDAPlaceGuard();
 
  private:
