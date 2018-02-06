@@ -12,10 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <gtest/gtest.h>
-#include <atomic>
-
 #include "threadpool.h"
+#include <atomic>
+#include "glog/logging.h"
+#include "gtest/gtest.h"
 
 namespace framework = paddle::framework;
 
@@ -54,4 +54,28 @@ TEST(ThreadPool, ConcurrentRun) {
   }
   pool->Wait();
   EXPECT_EQ(sum, ((n + 1) * n) / 2);
+}
+
+TEST(ThreadPool, Exception) {
+  framework::ThreadPool* pool = framework::ThreadPool::GetInstance();
+  {
+    auto exp_future =
+        pool->RunAndGetException([] { PADDLE_THROW("A test exception"); });
+    auto exp_ptr = exp_future.get();
+    ASSERT_NE(exp_ptr, nullptr);
+  }
+  {
+    auto failed_method = [] {
+      framework::ThreadPool::GetInstance()
+          ->Run([] { PADDLE_THROW("A test exception"); })
+          .wait();
+    };
+
+    // this statement should be failed. However, here we cannot use
+    // ASSERT_DEATH since it cannot be used in multi thread unittests
+    //
+    // ASSERT_DEATH(failed_method();, ".*A test exception.*");
+    // failed_method();
+    (void)(failed_method);  // Mark failed_method is unused.
+  }
 }
