@@ -120,8 +120,10 @@ inline void* Tensor::mutable_data(platform::Place place, std::type_index type) {
       "Please check Tensor::Resize has been called first.");
   int64_t size = numel() * SizeOfType(type);
   /* some versions of boost::variant don't have operator!= */
-  VLOG(10) << holder_->place() << ", " << place << ". They are equal? "
-           << (holder_->place() == place);
+  if (holder_ != nullptr) {
+    VLOG(10) << holder_->place() << ", " << place << ". They are equal? "
+             << (holder_->place() == place);
+  }
   if (holder_ == nullptr || !(holder_->place() == place) ||
       holder_->size() < size + offset_) {
     if (platform::is_cpu_place(place)) {
