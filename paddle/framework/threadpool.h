@@ -143,5 +143,10 @@ std::future<void> Async(Callback callback) {
   return ThreadPool::GetInstance()->Run(callback);
 }
 
+template <typename Callback>
+std::future<std::unique_ptr<platform::EnforceNotMet>> AsyncAndGetException(
+    Callback callback) {
+  return ThreadPool::GetInstance()->RunAndGetException(callback);
+}
 }  // namespace framework
 }  // namespace paddle
