@@ -104,8 +104,10 @@ void WaitOnPlaces(const std::vector<platform::Place> places) {
   platform::DeviceContextPool &pool = platform::DeviceContextPool::Instance();
 
   for (auto &place : places) {
+    VLOG(3) << "Wait device  " << place << " complete";
     auto &dev_ctx = *pool.Get(place);
     dev_ctx.Wait();
+    VLOG(3) << "Done";
   }
 }
 
