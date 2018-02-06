@@ -289,6 +289,7 @@ class ParallelDo(object):
                     local_inputs.add(out_var_name)
 
         params = list(set(params))
+        print(params)
 
         return [parent_block.var(name) for name in params]
 
