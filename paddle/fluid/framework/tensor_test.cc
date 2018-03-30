@@ -15,6 +15,8 @@
 #include "paddle/fluid/framework/tensor.h"
 #include <gtest/gtest.h>
 #include <string>
+#include <thread>
+#include "paddle/fluid/framework/tensor_util.h"
 
 namespace framework = paddle::framework;
 namespace platform = paddle::platform;
@@ -212,4 +214,31 @@ TEST(Tensor, Layout) {
   ASSERT_EQ(src.layout(), framework::DataLayout::kNHWC);
   src.set_layout(framework::DataLayout::kAnyLayout);
   ASSERT_EQ(src.layout(), framework::DataLayout::kAnyLayout);
+}
+
+TEST(Tensor, mutable_data_copy) {
+  std::vector<std::thread> threads;
+
+  for (size_t i = 0; i < 500; ++i) {
+    threads.emplace_back([] {
+      framework::Tensor cpu_tensor;
+      cpu_tensor.Resize(framework::make_ddim({14, 3, 224, 224}));
+      float* data = cpu_tensor.mutable_data<float>(platform::CPUPlace());
+      for (int64_t i = 0; i < cpu_tensor.numel(); ++i) {
+        data[i] = 1.0f;
+      }
+
+      platform::CUDADeviceContext ctx(platform::CUDAPlace(0));
+
+      for (size_t j = 0; j < 1000000; ++j) {
+        framework::Tensor gpu_tensor;
+        framework::TensorCopy(cpu_tensor, ctx.GetPlace(), ctx, &gpu_tensor);
+        ctx.Wait();
+      }
+    });
+  }
+
+  for (auto& th : threads) {
+    th.join();
+  }
 }
