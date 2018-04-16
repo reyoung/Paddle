@@ -24,6 +24,8 @@
 
 #include <string>
 #include <vector>
+#include "paddle/fluid/framework/details/broadcast_op_handle.h"
+#include "paddle/fluid/framework/details/reduce_op_handle.h"
 
 namespace paddle {
 namespace framework {
@@ -91,6 +93,7 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
 
   std::vector<std::unordered_set<std::string>> grad_deps_sets;
   std::vector<int> devices_;
+  std::vector<std::string> grad_names;
   std::unordered_set<std::string> reduced_grad;
 
   for (auto *op : program.Block(0).AllOps()) {
@@ -124,21 +127,80 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
 
         if (need_reduce) {
           for (size_t i = 0; i < places_.size(); ++i) {
-            auto &p = places_[i];
-            auto *s = local_scopes_[i];
-            result.ops_.emplace_back(new ComputationOpHandle(*op, s, p));
-            CreateOpHandleIOs(&result, *op, p, i);
+            CreateComputationalOp(result, op, i);
           }
 
           for (auto &g_name : g_names) {
             devices_.emplace_back(devices_.size() % places_.size());
             int dev_id = devices_.back();
-            grad_deps_sets.emplace_back({g_name});
+            grad_deps_sets.emplace_back();
+            auto &set = grad_deps_sets.back();
+            set.emplace(g_name);
+            grad_names.emplace_back(g_name);
+
+            // Insert ReduceOp
+            auto *reduce_op =
+                new ReduceOpHandle(local_scopes_, places_, *nccl_ctxs_);
+
+            for (size_t i = 0; i < places_.size(); ++i) {
+              reduce_op->AddInput(
+                  CreateOrGetLatestVarHandle(&result, g_name, places_[i], i));
+            }
+
+            {
+              result.vars_[dev_id].at(g_name).emplace_back(new VarHandle());
+              VarHandle *out = result.vars_[dev_id].at(g_name).back().get();
+              out->place_ = places_[dev_id];
+              out->name_ = g_name;
+              out->version_ = result.vars_[dev_id].at(g_name).size() - 1;
+              out->scope_idx_ = dev_id;
+              reduce_op->AddOutput(out);
+            }
+            result.ops_.emplace_back(reduce_op);
+          }
+        } else {  // Does not need reduce, so it is a optimizer op.
+          auto in_vars = op->InputArgumentNames();
+          size_t dev_offset = 0;
+          for (; dev_offset < grad_deps_sets.size(); ++dev_offset) {
+            auto &g_set = grad_deps_sets[dev_offset];
+            bool need_break = false;
+            for (auto &var_name : in_vars) {
+              if (g_set.count(var_name)) {
+                need_break = true;
+                break;
+              }
+            }
+            if (need_break) {
+              break;
+            }
+          }
+
+          PADDLE_ENFORCE_NE(dev_offset, grad_deps_sets.size());
+
+          CreateComputationalOp(result, op, dev_offset);
+          for (auto &o_name : op->OutputArgumentNames()) {
+            grad_deps_sets[dev_offset].emplace(o_name);
           }
         }
       }
     }
   }
+
+  //  // BCast Params
+  //  for (size_t i = 0; i < grad_names.size(); ++i) {
+  //    auto p_name = GetParamNameFromGradName(grad_names[i]);
+  //    auto dev_id = devices_[i];
+  //
+  //    auto *bcast_op = new BroadcastOpHandle(local_scopes_, places_);
+  //    {
+  //      auto *in =
+  //          CreateOrGetLatestVarHandle(&result, p_name, places_[dev_id],
+  //          dev_id);
+  //      bcast_op->AddInput(in);
+  //    }
+  //    for (size_t dev_offset = 0; i < places_.size(); ++i) {
+  //    }
+  //  }
 
   /*
     Dependency graph has been constructed. However, there are still data
@@ -158,6 +220,15 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
   }
 
   return std::unique_ptr<SSAGraph>(graph);
+}
+
+OpHandleBase *MultiDevSSAGraphBuilder::CreateComputationalOp(
+    SSAGraph &result, const OpDesc *op, size_t dev_offset) const {
+  auto &p = places_[dev_offset];
+  auto *s = local_scopes_[dev_offset];
+  result.ops_.emplace_back(new ComputationOpHandle(*op, s, p));
+  CreateOpHandleIOs(&result, *op, p, dev_offset);
+  return result.ops_.back().get();
 }
 
 std::vector<std::string> MultiDevSSAGraphBuilder::GetParamGradientNames(
@@ -186,16 +257,13 @@ bool MultiDevSSAGraphBuilder::AppendForwardOp(SSAGraph *result_ptr,
   auto &result = *result_ptr;
   bool res = false;
   for (size_t i = 0; i < places_.size(); ++i) {
-    auto &p = places_[i];
-    auto *s = local_scopes_[i];
-
-    result.ops_.emplace_back(new ComputationOpHandle(*op, s, p));
-    auto *op_handle = result.ops_.back().get();
-    this->CreateOpHandleIOs(&result, *op, p, i);
+    auto *op_handle = CreateComputationalOp(result, op, i);
 
     auto var_names = op->OutputArgumentNames();
 
     if (var_names.size() == 1 && var_names[0] == loss_var_name_) {
+      auto p = places_[i];
+      auto s = local_scopes_[i];
 // Insert ScaleCost OpHandle
 #ifdef PADDLE_WITH_CUDA
       auto *communication_dev_ctx = nccl_ctxs_->DevCtx(p);

@@ -65,6 +65,10 @@ class MultiDevSSAGraphBuilder : public SSAGraphBuilder {
   bool IsSendOp(const OpDesc *op) const;
 
   std::vector<std::string> GetParamGradientNames(const OpDesc *op) const;
+
+  OpHandleBase *CreateComputationalOp(SSAGraph &result,  // NOLINT
+                                      const OpDesc *op,  // NOLINT
+                                      size_t dev_offset) const;
 };
 }  // namespace details
 }  // namespace framework

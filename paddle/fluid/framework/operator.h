@@ -61,6 +61,10 @@ inline std::string GradVarName(const std::string& var_name) {
   return var_name + kGradVarSuffix;
 }
 
+inline std::string GetParamNameFromGradName(const std::string& var_name) {
+  return var_name.substr(0, var_name.size() - strlen(kGradVarSuffix));
+}
+
 proto::VarType::Type GetDataTypeOfVar(const Variable* var);
 
 class OperatorBase;
