@@ -205,9 +205,7 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
   AddOutputToLeafOps(&result);
 
   if (VLOG_IS_ON(10)) {
-    std::ostringstream sout;
-    PrintGraphviz(*graph, sout);
-    VLOG(10) << sout.str();
+    PrintGraphviz(*graph, std::cerr);
   }
 
   return std::unique_ptr<SSAGraph>(graph);
