@@ -233,7 +233,7 @@ TEST(ReduceTester, TestCPUReduceTestSelectedRows) {
 TEST(ReduceTester, TestGPUReduceTestSelectedRows) {
   TestReduceOpHandle test_op;
   size_t input_scope_idx = 0;
-  test_op.InitCtxOnGpu(false);
+  test_op.InitCtxOnGpu(true);
   test_op.InitReduceOp(input_scope_idx);
   test_op.TestReduceSelectedRows(input_scope_idx);
 }

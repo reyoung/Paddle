@@ -53,12 +53,13 @@ struct GatherSelectedRows {
   void operator()(
       const std::vector<SelectedRows> &src_selecte_rows_,
       const std::vector<platform::Place> &in_places,
-      const std::map<platform::Place, platform::DeviceContext> &dev_ctxes,
+      const std::unordered_map<platform::Place, platform::DeviceContext *,
+                               platform::PlaceHash> &dev_ctxes,
       SelectedRows *dst_selecte_rows) const {
     PADDLE_ENFORCE(!src_selecte_rows_.empty());
 
     std::vector<Tensor> in_tensors;
-    std::vector<std::vector<int64_t>> out_rows;
+    std::vector<int64_t> out_rows;
 
     for (auto &in_sr : src_selecte_rows_) {
       in_tensors.emplace_back(in_sr.value());
