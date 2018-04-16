@@ -45,7 +45,7 @@ class MultiDevSSAGraphBuilder : public SSAGraphBuilder {
   std::unique_ptr<SSAGraph> Build(const ProgramDesc &program) const override;
 
  private:
-  void CreateOpHandleIOs(SSAGraph *result, const OpDesc *op,
+  void CreateOpHandleIOs(SSAGraph *result, const OpDesc &op,
                          const platform::Place &p, const size_t &i) const;
 
  private:
