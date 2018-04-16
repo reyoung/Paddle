@@ -42,7 +42,7 @@ void ThreadedSSAGraphExecutor::RunDelayedOps(
 
 FeedFetchList ThreadedSSAGraphExecutor::Run(
     const std::vector<std::string> &fetch_tensors) {
-  std::unordered_map<OpHandleBase *, size_t> pending_ops;
+  std::unordered_map<OpHandleBase *, int> pending_ops;
   std::unordered_set<VarHandleBase *> pending_vars;
   BlockingQueue<VarHandleBase *> ready_vars;
   std::unordered_set<OpHandleBase *> ready_ops;
@@ -165,6 +165,9 @@ FeedFetchList ThreadedSSAGraphExecutor::Run(
           } else {
             ready_ops.insert(op);
           }
+        }
+        if (deps < 0) {
+          LOG(FATAL) << op->DebugString() << " Error!";
         }
       }
     }
