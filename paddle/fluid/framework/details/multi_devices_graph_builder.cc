@@ -88,71 +88,53 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
       places_.size());
 
   bool is_forwarding = true;
+
+  std::vector<std::unordered_set<std::string>> grad_deps_sets;
+  std::vector<int> devices_;
+  std::unordered_set<std::string> reduced_grad;
+
   for (auto *op : program.Block(0).AllOps()) {
-    if (!is_forwarding) {
-      // FIXME(yy): Do not hard code like this
-      if (op->OutputArgumentNames().size() == 1 &&
-          op->OutputArgumentNames()[0] == GradVarName(loss_var_name_)) {
-        continue;  // Drop fill 1. for backward coeff;
-      }
-    }
-
-    // append send op if program is distributed trainer main program.
-    // always use the first device
-    if (!is_forwarding && op->Type() == "send") {
-      auto &p = places_[0];
-      auto *s = local_scopes_[0];
-      // FIXME(wuyi): send op always copy from GPU 0
-      result.ops_.emplace_back(new SendOpHandle(*op, s, p));
-      // Create inputs for output on original place and no ssa output
-      // is created for send op.
-      CreateOpHandleIOs(&result, *op, p, 0);
-      continue;
-    }
-
     if (is_forwarding) {
       if (AppendForwardOp(&result, op)) {
         is_forwarding = false;
       }
-    }
+    } else {
+      // FIXME(yy): Do not hard code like this
+      if (IsScaleGradOp(op)) {
+        continue;  // Drop fill 1. for backward coeff;
+      } else if (IsSendOp(op)) {
+        // append send op if program is distributed trainer main program.
+        // always use the first device
 
-    if (!is_forwarding) {
-      auto var_names = op->OutputArgumentNames();
-      // Currently, we assume that once gradient is generated, it can be
-      // broadcast, and each gradient is only broadcast once. But there are no
-      // other cases, for example, we need to adjust the gradient according to
-      // the input when we get the gradient, which is not considered at present.
-      for (auto &og : var_names) {
-        if (grad_names_.count(og) != 0 &&
-            og_has_been_broadcast.count(og) == 0) {  // is param grad
-                                                     // Insert NCCL AllReduce Op
-          og_has_been_broadcast.insert(og);
-#ifdef PADDLE_WITH_CUDA
-          result.ops_.emplace_back(
-              new NCCLAllReduceOpHandle(local_scopes_, places_, *nccl_ctxs_));
-          auto *op_handle = result.ops_.back().get();
+        auto &p = places_[0];
+        auto *s = local_scopes_[0];
+        // FIXME(wuyi): send op always copy from GPU 0
+        result.ops_.emplace_back(new SendOpHandle(*op, s, p));
+        // Create inputs for output on original place and no ssa output
+        // is created for send op.
+        CreateOpHandleIOs(&result, *op, p, 0);
+        continue;
+      } else {
+        std::vector<std::string> g_names = GetParamGradientNames(op);
+        bool need_reduce = !g_names.empty();
+        for (auto &g_name : g_names) {
+          if (!need_reduce) break;
+          need_reduce = !reduced_grad.count(g_name);
+        }
 
+        if (need_reduce) {
           for (size_t i = 0; i < places_.size(); ++i) {
             auto &p = places_[i];
-            auto &vars = result.vars_[i][og];
-
-            if (vars.empty()) {  // This device has no data. continue.
-              continue;
-            }
-            auto &prev_grad = vars[vars.size() - 1];
-            op_handle->AddInput(prev_grad.get());
-
-            vars.emplace_back(new VarHandle);
-            auto &var = vars.back();
-            var->place_ = p;
-            var->name_ = og;
-            var->version_ = vars.size() - 1;
-
-            op_handle->AddOutput(var.get());
+            auto *s = local_scopes_[i];
+            result.ops_.emplace_back(new ComputationOpHandle(*op, s, p));
+            CreateOpHandleIOs(&result, *op, p, i);
           }
-#else
-          PADDLE_ENFORCE("Not implemented");
-#endif
+
+          for (auto &g_name : g_names) {
+            devices_.emplace_back(devices_.size() % places_.size());
+            int dev_id = devices_.back();
+            grad_deps_sets.emplace_back({g_name});
+          }
         }
       }
     }
@@ -178,6 +160,27 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
   return std::unique_ptr<SSAGraph>(graph);
 }
 
+std::vector<std::string> MultiDevSSAGraphBuilder::GetParamGradientNames(
+    const OpDesc *op) const {
+  auto var_names = op->OutputArgumentNames();
+  std::vector<std::__cxx11::string> g_names;
+  for (auto &var_name : var_names) {
+    if (grad_names_.count(var_name)) {
+      g_names.emplace_back(var_name);
+    }
+  }
+  return g_names;
+}
+
+bool MultiDevSSAGraphBuilder::IsSendOp(const OpDesc *op) const {
+  return op->Type() == "send";
+}
+
+bool MultiDevSSAGraphBuilder::IsScaleGradOp(const OpDesc *op) const {
+  return op->OutputArgumentNames().size() == 1 &&
+         op->OutputArgumentNames()[0] == GradVarName(loss_var_name_);
+}
+
 bool MultiDevSSAGraphBuilder::AppendForwardOp(SSAGraph *result_ptr,
                                               const OpDesc *op) const {
   auto &result = *result_ptr;
@@ -188,7 +191,7 @@ bool MultiDevSSAGraphBuilder::AppendForwardOp(SSAGraph *result_ptr,
 
     result.ops_.emplace_back(new ComputationOpHandle(*op, s, p));
     auto *op_handle = result.ops_.back().get();
-    this->CreateOpHandleIOs(&result, op, p, i);
+    this->CreateOpHandleIOs(&result, *op, p, i);
 
     auto var_names = op->OutputArgumentNames();
 

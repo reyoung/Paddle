@@ -59,6 +59,12 @@ class MultiDevSSAGraphBuilder : public SSAGraphBuilder {
 #endif
 
   bool AppendForwardOp(SSAGraph *result_ptr, const OpDesc *op) const;
+
+  bool IsScaleGradOp(const OpDesc *op) const;
+
+  bool IsSendOp(const OpDesc *op) const;
+
+  std::vector<std::string> GetParamGradientNames(const OpDesc *op) const;
 };
 }  // namespace details
 }  // namespace framework
