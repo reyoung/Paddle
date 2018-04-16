@@ -23,6 +23,7 @@
 #include "paddle/fluid/framework/scope.h"
 #include "paddle/fluid/framework/selected_rows.h"
 #include "paddle/fluid/platform/device_context.h"
+#include "paddle/fluid/platform/nccl_helper.h"
 
 namespace paddle {
 namespace framework {
@@ -31,11 +32,16 @@ namespace details {
 struct ReduceOpHandle : public OpHandleBase {
   const std::vector<Scope *> &local_scopes_;
   const std::vector<platform::Place> &places_;
-  const platform::NCCLContextMap &nccl_ctxs_;
 
+#ifdef PADDLE_WITH_CUDA
+  const platform::NCCLContextMap &nccl_ctxs_;
   ReduceOpHandle(const std::vector<Scope *> &local_scopes,
                  const std::vector<platform::Place> &places,
                  const platform::NCCLContextMap &nccl_ctxs_);
+#endif
+
+  ReduceOpHandle(const std::vector<Scope *> &local_scopes,
+                 const std::vector<platform::Place> &places);
 
   std::string Name() const override;
 

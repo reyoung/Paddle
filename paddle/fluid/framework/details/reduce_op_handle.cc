@@ -21,10 +21,20 @@ namespace paddle {
 namespace framework {
 namespace details {
 
+#ifdef PADDLE_WITH_CUDA
 ReduceOpHandle::ReduceOpHandle(const std::vector<Scope *> &local_scopes,
                                const std::vector<platform::Place> &places,
                                const platform::NCCLContextMap &ctxs)
-    : local_scopes_(local_scopes), places_(places), nccl_ctxs_(ctxs) {}
+    : local_scopes_(local_scopes), places_(places), nccl_ctxs_(ctxs) {
+  for (auto p_ctx : ctxs.contexts_) {
+    dev_ctxes_[p_ctx.first] = p_ctx.second.ctx_.get();
+  }
+}
+#endif
+
+ReduceOpHandle::ReduceOpHandle(const std::vector<Scope *> &local_scopes,
+                               const std::vector<platform::Place> &places)
+    : local_scopes_(local_scopes), places_(places) {}
 
 void ReduceOpHandle::RunImpl() {
   // the input may have dummy var.
@@ -51,11 +61,11 @@ void ReduceOpHandle::RunImpl() {
                     "The number of output should be one.");
 
   // Wait input done, this Wait is asynchronous operation
-  auto &in_place = in_var_handle[0]->place_;
-  if (in_var_handle[0]->generated_op_) {
+  auto &in_place = in_var_handles[0]->place_;
+  if (in_var_handles[0]->generated_op_) {
     for (auto *in : in_var_handles) {
       auto &in_p = in->place_;
-      in_var_handle[0]->generated_op_->Wait(dev_ctxes_[in_p]);
+      in_var_handles[0]->generated_op_->Wait(dev_ctxes_[in_p]);
     }
   }
 
@@ -64,13 +74,11 @@ void ReduceOpHandle::RunImpl() {
   auto pre_place = in_0_handle->place_;
 
   std::vector<platform::Place> in_places;
-  std::map<platform::Place, platform::DeviceContext> dev_ctxes;
   for (auto *in_handle : in_var_handles) {
     auto in_p = in_handle->place_;
     PADDLE_ENFORCE_EQ(in_p.which(), pre_place.which(),
                       "Places must be all on CPU or all on CUDA.");
     in_places.emplace_back(in_p);
-    dev_ctxes[in_p] = nccl_ctxs_[in_p];
   }
 
   auto out_var = local_scopes_[out_var_handles[0]->scope_idx_]->FindVar(
@@ -82,6 +90,7 @@ void ReduceOpHandle::RunImpl() {
   if (pre_in_var->IsType<framework::SelectedRows>()) {
     GatherSelectedRows gather;
     std::vector<SelectedRows> in_selected_rows;
+    auto pre_in = pre_in_var->Get<framework::SelectedRows>();
 
     for (auto *in_handle : in_var_handles) {
       auto in_var =
@@ -93,9 +102,8 @@ void ReduceOpHandle::RunImpl() {
 
       in_selected_rows.emplace_back(in_sr);
     }
-    auto &trg = out_var->GetMutable<framework::SelectedRows>();
-    gather(in_selected_rows, in_places, dev_ctxes, &trg);
-
+    auto trg = out_var->GetMutable<framework::SelectedRows>();
+    gather(in_selected_rows, in_places, dev_ctxes_, trg);
   } else {
     // reduce tensor
     auto pre_in = pre_in_var->Get<framework::LoDTensor>();
@@ -110,15 +118,15 @@ void ReduceOpHandle::RunImpl() {
       PADDLE_ENFORCE_EQ(in_sr.type(), pre_in.type(),
                         "The type of input is not consistent.");
 
-      lod_tensors.emplace_back(in_sr.value());
+      lod_tensors.emplace_back(in_sr);
     }
 
-    auto &trg = out_var->GetMutable<framework::LoDTensor>();
+    auto trg = out_var->GetMutable<framework::LoDTensor>();
     trg->Resize(pre_in.dims());
     trg->mutable_data(out_var_handles[0]->place_, pre_in.type());
 
     if (paddle::platform::is_cpu_place(pre_place)) {
-      ReduceLoDTensor func(lod_tensors, &trg);
+      ReduceLoDTensor func(lod_tensors, trg);
       VisitDataType(ToDataType(lod_tensors[0].type()), func);
 
     } else if (paddle::platform::is_gpu_place(pre_place)) {
@@ -162,7 +170,6 @@ void ReduceOpHandle::RunImpl() {
 #else
       PADDLE_THROW("CUDA is not support.");
 #endif
-
     } else {
       PADDLE_THROW("Error");
     }

@@ -53,7 +53,8 @@ struct GatherSelectedRows {
   void operator()(
       const std::vector<SelectedRows> &src_selecte_rows_,
       const std::vector<platform::Place> &in_places,
-      const std::map<platform::Place, platform::DeviceContext> &dev_ctxes,
+      const std::unordered_map<platform::Place, platform::DeviceContext *,
+                               platform::PlaceHash> &dev_ctxes,
       SelectedRows *dst_selecte_rows) const {
     PADDLE_ENFORCE(!src_selecte_rows_.empty());
 
