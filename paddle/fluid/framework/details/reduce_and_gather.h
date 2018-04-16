@@ -14,8 +14,11 @@
 
 #pragma once
 #include <algorithm>
+#include <map>
 #include <vector>
-#include "paddle/fluid/framework/details/reduce_util.h"
+#include "paddle/fluid/framework/details/reduce_and_gather.h"
+#include "paddle/fluid/framework/lod_tensor.h"
+#include "paddle/fluid/framework/selected_rows.h"
 namespace paddle {
 namespace framework {
 namespace details {
@@ -42,6 +45,46 @@ struct ReduceLoDTensor {
       PADDLE_ENFORCE_EQ(t.type(), t0.type());
       std::transform(t.data<T>(), t.data<T>() + t.numel(), dst, dst,
                      [](T a, T b) -> T { return a + b; });
+    }
+  }
+};
+
+struct GatherSelectedRows {
+  void operator()(
+      const std::vector<SelectedRows> &src_selecte_rows_,
+      const std::vector<platform::Place> &in_places,
+      const std::map<platform::Place, platform::DeviceContext> &dev_ctxes,
+      SelectedRows *dst_selecte_rows) const {
+    PADDLE_ENFORCE(!src_selecte_rows_.empty());
+
+    std::vector<Tensor> in_tensors;
+    std::vector<std::vector<int64_t>> out_rows;
+
+    for (auto &in_sr : src_selecte_rows_) {
+      in_tensors.emplace_back(in_sr.value());
+      out_rows.insert(out_rows.end(), in_sr.rows.begin(), in_sr.rows.end());
+    }
+
+    auto &pre_in = src_selecte_rows_[0];
+
+    dst_tensor_.set_height(pre_in.height());
+    dst_selecte_rows.set_rows(out_rows);
+    size_t rows = out_rows.size();
+    DDim out_dim = pre_in.GetCompleteDims();
+    out_dim[0] = static_cast<int64_t>(rows);
+    dst_selecte_rows.mutable_value()->Resize(out_dim);
+    dst_selecte_rows.mutable_value()->mutable_data(out_place,
+                                                   pre_in.value().type());
+    Tensor *out_tensor = dst_selecte_rows.mutable_value();
+
+    // copy
+    int s = 0, e = 0;
+    for (size_t j = 0; j < in_tensors.size(); ++j) {
+      e += in_tensors[j].dims()[0];
+      auto sub_out = out_tensor->Slice(s, e);
+      paddle::framework::TensorCopy(in_tensors[j], out_place,
+                                    *(dev_ctxes[in_places[j]]), &sub_out);
+      s = e;
     }
   }
 };

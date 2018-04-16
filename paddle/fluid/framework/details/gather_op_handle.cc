@@ -100,6 +100,7 @@ void GatherOpHandle::RunImpl() {
       local_scopes_[out_scope_idx]->FindVar(out_var_handles[0]->name_);
 
   auto out = out_var->GetMutable<framework::SelectedRows>();
+
   out->set_height(pre_in.height());
   out->set_rows(out_rows);
   size_t rows = out_rows.size();
