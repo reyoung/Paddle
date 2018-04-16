@@ -21,21 +21,6 @@ namespace paddle {
 namespace framework {
 namespace details {
 
-#ifdef PADDLE_WITH_CUDA
-ReduceOpHandle::ReduceOpHandle(const std::vector<Scope *> &local_scopes,
-                               const std::vector<platform::Place> &places,
-                               const platform::NCCLContextMap &ctxs)
-    : local_scopes_(local_scopes), places_(places), nccl_ctxs_(ctxs) {
-  for (auto p_ctx : ctxs.contexts_) {
-    dev_ctxes_[p_ctx.first] = p_ctx.second.ctx_.get();
-  }
-}
-#endif
-
-ReduceOpHandle::ReduceOpHandle(const std::vector<Scope *> &local_scopes,
-                               const std::vector<platform::Place> &places)
-    : local_scopes_(local_scopes), places_(places) {}
-
 void ReduceOpHandle::RunImpl() {
   // the input may have dummy var.
   std::vector<VarHandle *> in_var_handles;
@@ -61,7 +46,6 @@ void ReduceOpHandle::RunImpl() {
                     "The number of output should be one.");
 
   // Wait input done, this Wait is asynchronous operation
-  auto &in_place = in_var_handles[0]->place_;
   if (in_var_handles[0]->generated_op_) {
     for (auto *in : in_var_handles) {
       auto &in_p = in->place_;
@@ -88,9 +72,8 @@ void ReduceOpHandle::RunImpl() {
       local_scopes_[in_0_handle->scope_idx_]->FindVar(in_0_handle->name_);
 
   if (pre_in_var->IsType<framework::SelectedRows>()) {
-    GatherSelectedRows gather;
-    std::vector<SelectedRows> in_selected_rows;
-    auto pre_in = pre_in_var->Get<framework::SelectedRows>();
+    std::vector<const SelectedRows *> in_selected_rows;
+    auto &pre_in = pre_in_var->Get<framework::SelectedRows>();
 
     for (auto *in_handle : in_var_handles) {
       auto in_var =
@@ -100,10 +83,11 @@ void ReduceOpHandle::RunImpl() {
       PADDLE_ENFORCE_EQ(in_sr.value().type(), pre_in.value().type(),
                         "The type of input is not consistent.");
 
-      in_selected_rows.emplace_back(in_sr);
+      in_selected_rows.emplace_back(&in_sr);
     }
     auto trg = out_var->GetMutable<framework::SelectedRows>();
-    gather(in_selected_rows, in_places, dev_ctxes_, trg);
+    GatherSelectedRows(in_selected_rows, in_places, dev_ctxes_,
+                       out_var_handles[0]->place_, trg);
   } else {
     // reduce tensor
     auto pre_in = pre_in_var->Get<framework::LoDTensor>();
@@ -131,36 +115,36 @@ void ReduceOpHandle::RunImpl() {
 
     } else if (paddle::platform::is_gpu_place(pre_place)) {
 #ifdef PADDLE_WITH_CUDA
-      int root =
-          static_cast<platform::CUDAPlace>(out_var_handles[0]->place_).device;
 
       std::vector<std::function<void()>> all_reduce_calls;
+      //      int dtype = -1;
       for (size_t i = 0; i < local_scopes_.size(); ++i) {
-        auto &p = in_places[i];
-        auto &lod_tensor = lod_tensors[i];
+        //        auto &p = in_places[i];
+        //        auto &lod_tensor = lod_tensors[i];
 
-        void *buffer = const_cast<void *>(lod_tensor.data<void>());
+        //        void *buffer = const_cast<void *>(lod_tensor.data<void>());
 
-        if (dtype == -1) {
-          dtype = platform::ToNCCLDataType(lod_tensor.type());
-        }
-
-        T *recvbuffer = nullptr;
-        if (root == gpu_id) {
-          recvbuffer = trg->mutable_data(out_var_handles[0]->place_);
-        }
-
-        int dev_id = boost::get<platform::CUDAPlace>(p).device;
-        auto &nccl_ctx = nccl_ctxs_.at(dev_id);
-        auto stream = nccl_ctx.stream();
-        auto comm = nccl_ctx.comm_;
-
-        all_reduce_calls.emplace_back([=] {
-          PADDLE_ENFORCE(platform::dynload::ncclReduce(
-              buffer, recvbuffer, static_cast<size_t>(lod_tensor.numel()),
-              platform::ToNCCLDataType(lod_tensor.type()), ncclSum, root, comm,
-              stream));
-        });
+        //        if (dtype == -1) {
+        //          dtype = platform::ToNCCLDataType(lod_tensor.type());
+        //        }
+        //
+        //        T *recvbuffer = nullptr;
+        //        if (root == gpu_id) {
+        //          recvbuffer = trg->mutable_data(out_var_handles[0]->place_);
+        //        }
+        //
+        //        int dev_id = boost::get<platform::CUDAPlace>(p).device;
+        //        auto &nccl_ctx = nccl_ctxs_.at(dev_id);
+        //        auto stream = nccl_ctx.stream();
+        //        auto comm = nccl_ctx.comm_;
+        //
+        //        all_reduce_calls.emplace_back([=] {
+        //          PADDLE_ENFORCE(platform::dynload::ncclReduce(
+        //              buffer, recvbuffer,
+        //              static_cast<size_t>(lod_tensor.numel()),
+        //              platform::ToNCCLDataType(lod_tensor.type()), ncclSum,
+        //              root, comm, stream));
+        //        });
       }
 
       platform::NCCLGroupGuard guard;

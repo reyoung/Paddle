@@ -49,46 +49,45 @@ struct ReduceLoDTensor {
   }
 };
 
-struct GatherSelectedRows {
-  void operator()(
-      const std::vector<SelectedRows> &src_selecte_rows_,
-      const std::vector<platform::Place> &in_places,
-      const std::unordered_map<platform::Place, platform::DeviceContext *,
-                               platform::PlaceHash> &dev_ctxes,
-      SelectedRows *dst_selecte_rows) const {
-    PADDLE_ENFORCE(!src_selecte_rows_.empty());
+inline void GatherSelectedRows(
+    const std::vector<const SelectedRows *> &src_selecte_rows_,
+    const std::vector<platform::Place> &in_places,
+    const std::unordered_map<platform::Place, platform::DeviceContext *,
+                             platform::PlaceHash> &dev_ctxes,
+    const platform::Place &out_place, SelectedRows *dst_selecte_rows) {
+  PADDLE_ENFORCE(!src_selecte_rows_.empty());
 
-    std::vector<Tensor> in_tensors;
-    std::vector<std::vector<int64_t>> out_rows;
+  std::vector<Tensor> in_tensors;
+  std::vector<int64_t> out_rows;
 
-    for (auto &in_sr : src_selecte_rows_) {
-      in_tensors.emplace_back(in_sr.value());
-      out_rows.insert(out_rows.end(), in_sr.rows.begin(), in_sr.rows.end());
-    }
-
-    auto &pre_in = src_selecte_rows_[0];
-
-    dst_tensor_.set_height(pre_in.height());
-    dst_selecte_rows.set_rows(out_rows);
-    size_t rows = out_rows.size();
-    DDim out_dim = pre_in.GetCompleteDims();
-    out_dim[0] = static_cast<int64_t>(rows);
-    dst_selecte_rows.mutable_value()->Resize(out_dim);
-    dst_selecte_rows.mutable_value()->mutable_data(out_place,
-                                                   pre_in.value().type());
-    Tensor *out_tensor = dst_selecte_rows.mutable_value();
-
-    // copy
-    int s = 0, e = 0;
-    for (size_t j = 0; j < in_tensors.size(); ++j) {
-      e += in_tensors[j].dims()[0];
-      auto sub_out = out_tensor->Slice(s, e);
-      paddle::framework::TensorCopy(in_tensors[j], out_place,
-                                    *(dev_ctxes[in_places[j]]), &sub_out);
-      s = e;
-    }
+  for (auto in_sr_ptr : src_selecte_rows_) {
+    auto &in_sr = *in_sr_ptr;
+    in_tensors.emplace_back(in_sr.value());
+    out_rows.insert(out_rows.end(), in_sr.rows().begin(), in_sr.rows().end());
   }
-};
+
+  auto &pre_in = src_selecte_rows_[0];
+
+  auto &dst_tensor = *dst_selecte_rows;
+  dst_tensor.set_height(pre_in->height());
+  dst_tensor.set_rows(out_rows);
+  size_t rows = out_rows.size();
+  DDim out_dim = pre_in->GetCompleteDims();
+  out_dim[0] = static_cast<int64_t>(rows);
+  dst_tensor.mutable_value()->Resize(out_dim);
+  dst_tensor.mutable_value()->mutable_data(out_place, pre_in->value().type());
+  Tensor *out_tensor = dst_tensor.mutable_value();
+
+  // copy
+  int s = 0, e = 0;
+  for (size_t j = 0; j < in_tensors.size(); ++j) {
+    e += in_tensors[j].dims()[0];
+    auto sub_out = out_tensor->Slice(s, e);
+    paddle::framework::TensorCopy(in_tensors[j], out_place,
+                                  *(dev_ctxes.at(in_places[j])), &sub_out);
+    s = e;
+  }
+}
 
 }  // namespace details
 }  // namespace framework
