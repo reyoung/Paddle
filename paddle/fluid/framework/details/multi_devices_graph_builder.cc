@@ -55,7 +55,8 @@ MultiDevSSAGraphBuilder::MultiDevSSAGraphBuilder(
   }
 }
 
-void MultiDevSSAGraphBuilder::CreateOpHandleIOs(SSAGraph *result, OpDesc *op,
+void MultiDevSSAGraphBuilder::CreateOpHandleIOs(SSAGraph *result,
+                                                const OpDesc *op,
                                                 const platform::Place &p,
                                                 const size_t &i) const {
   auto *op_handle = result->ops_.back().get();
@@ -89,7 +90,6 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
 
   bool is_forwarding = true;
   for (auto *op : program.Block(0).AllOps()) {
-    bool change_forward = false;
     if (!is_forwarding) {
       // FIXME(yy): Do not hard code like this
       if (op->OutputArgumentNames().size() == 1 &&
@@ -111,44 +111,10 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
       continue;
     }
 
-    for (size_t i = 0; i < places_.size(); ++i) {
-      auto &p = places_[i];
-      auto *s = local_scopes_[i];
-
-      result.ops_.emplace_back(new ComputationOpHandle(*op, s, p));
-      auto *op_handle = result.ops_.back().get();
-      CreateOpHandleIOs(&result, op, p, i);
-
-      auto var_names = op->OutputArgumentNames();
-
-      if (is_forwarding) {
-        if (var_names.size() == 1 && var_names[0] == loss_var_name_) {
-// Insert ScaleCost OpHandle
-#ifdef PADDLE_WITH_CUDA
-          auto *communication_dev_ctx = nccl_ctxs_->DevCtx(p);
-#else
-          auto *communication_dev_ctx =
-              platform::DeviceContextPool::Instance().Get(platform::CPUPlace());
-#endif
-
-          op_handle = new ScaleLossGradOpHandle(local_scopes_.size(), s, p,
-                                                communication_dev_ctx);
-          result.ops_.emplace_back(op_handle);
-
-          // FIXME: Currently ScaleLossGradOp only use device_count as scale
-          // factor. So it does not depend on any other operators.
-          // VarHandle *loss = GetVarHandle(loss_var_name, place);
-          // loss->pending_ops_.emplace_back(op_handle);
-          // op_handle->inputs_.emplace_back(loss);
-
-          CreateOpOutput(&result, op_handle, GradVarName(loss_var_name_), p, i);
-          change_forward = true;
-        }
+    if (is_forwarding) {
+      if (AppendForwardOp(&result, op)) {
+        is_forwarding = false;
       }
-    }
-
-    if (change_forward) {
-      is_forwarding = false;
     }
 
     if (!is_forwarding) {
@@ -211,7 +177,47 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
   }
 
   return std::unique_ptr<SSAGraph>(graph);
-}  // namespace details
+}
+
+bool MultiDevSSAGraphBuilder::AppendForwardOp(SSAGraph *result_ptr,
+                                              const OpDesc *op) const {
+  auto &result = *result_ptr;
+  bool res = false;
+  for (size_t i = 0; i < places_.size(); ++i) {
+    auto &p = places_[i];
+    auto *s = local_scopes_[i];
+
+    result.ops_.emplace_back(new ComputationOpHandle(*op, s, p));
+    auto *op_handle = result.ops_.back().get();
+    this->CreateOpHandleIOs(&result, op, p, i);
+
+    auto var_names = op->OutputArgumentNames();
+
+    if (var_names.size() == 1 && var_names[0] == loss_var_name_) {
+// Insert ScaleCost OpHandle
+#ifdef PADDLE_WITH_CUDA
+      auto *communication_dev_ctx = nccl_ctxs_->DevCtx(p);
+#else
+      auto *communication_dev_ctx =
+          platform::DeviceContextPool::Instance().Get(platform::CPUPlace());
+#endif
+
+      op_handle = new ScaleLossGradOpHandle(local_scopes_.size(), s, p,
+                                            communication_dev_ctx);
+      result.ops_.emplace_back(op_handle);
+
+      // FIXME: Currently ScaleLossGradOp only use device_count as scale
+      // factor. So it does not depend on any other operators.
+      // VarHandle *loss = GetVarHandle(loss_var_name, place);
+      // loss->pending_ops_.emplace_back(op_handle);
+      // op_handle->inputs_.emplace_back(loss);
+
+      CreateOpOutput(&result, op_handle, GradVarName(loss_var_name_), p, i);
+      res = true;
+    }
+  }
+  return res;
+}
 }  // namespace details
 }  // namespace framework
 }  // namespace paddle
