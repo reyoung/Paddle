@@ -61,7 +61,7 @@ void ReduceOpHandle::RunImpl() {
                     "The number of output should be one.");
 
   // Wait input done, this Wait is asynchronous operation
-  auto &in_place = in_var_handles[0]->place_;
+  auto in_place = in_var_handles[0]->place_;
   if (in_var_handles[0]->generated_op_) {
     for (auto *in : in_var_handles) {
       auto &in_p = in->place_;
@@ -103,7 +103,8 @@ void ReduceOpHandle::RunImpl() {
       in_selected_rows.emplace_back(in_sr);
     }
     auto trg = out_var->GetMutable<framework::SelectedRows>();
-    gather(in_selected_rows, in_places, dev_ctxes_, trg);
+    gather(in_selected_rows, in_places, out_var_handles[0]->place_, dev_ctxes_,
+           trg);
   } else {
     // reduce tensor
     auto pre_in = pre_in_var->Get<framework::LoDTensor>();
@@ -139,22 +140,21 @@ void ReduceOpHandle::RunImpl() {
         auto &p = in_places[i];
         auto &lod_tensor = lod_tensors[i];
 
-        void *buffer = const_cast<void *>(lod_tensor.data<void>());
+        int gpu_id = static_cast<>
 
-        if (dtype == -1) {
-          dtype = platform::ToNCCLDataType(lod_tensor.type());
-        }
-
-        T *recvbuffer = nullptr;
-        if (root == gpu_id) {
-          recvbuffer = trg->mutable_data(out_var_handles[0]->place_);
-        }
+            void *buffer = const_cast<void *>(lod_tensor.data<void>());
 
         int dev_id = boost::get<platform::CUDAPlace>(p).device;
         auto &nccl_ctx = nccl_ctxs_.at(dev_id);
         auto stream = nccl_ctx.stream();
         auto comm = nccl_ctx.comm_;
 
+        void *recvbuffer = nullptr;
+        if (root == dev_id) {
+          recvbuffer = trg->mutable_data(out_var_handles[0]->place_);
+        }
+
+        // error: get the sizeof of var.type()
         all_reduce_calls.emplace_back([=] {
           PADDLE_ENFORCE(platform::dynload::ncclReduce(
               buffer, recvbuffer, static_cast<size_t>(lod_tensor.numel()),

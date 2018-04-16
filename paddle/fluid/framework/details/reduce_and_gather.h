@@ -53,6 +53,7 @@ struct GatherSelectedRows {
   void operator()(
       const std::vector<SelectedRows> &src_selecte_rows_,
       const std::vector<platform::Place> &in_places,
+      const platform::Place &out_place,
       const std::unordered_map<platform::Place, platform::DeviceContext *,
                                platform::PlaceHash> &dev_ctxes,
       SelectedRows *dst_selecte_rows) const {
@@ -63,20 +64,20 @@ struct GatherSelectedRows {
 
     for (auto &in_sr : src_selecte_rows_) {
       in_tensors.emplace_back(in_sr.value());
-      out_rows.insert(out_rows.end(), in_sr.rows.begin(), in_sr.rows.end());
+      out_rows.insert(out_rows.end(), in_sr.rows().begin(), in_sr.rows().end());
     }
 
     auto &pre_in = src_selecte_rows_[0];
 
-    dst_tensor_.set_height(pre_in.height());
-    dst_selecte_rows.set_rows(out_rows);
+    dst_selecte_rows->set_height(pre_in.height());
+    dst_selecte_rows->set_rows(out_rows);
     size_t rows = out_rows.size();
     DDim out_dim = pre_in.GetCompleteDims();
     out_dim[0] = static_cast<int64_t>(rows);
-    dst_selecte_rows.mutable_value()->Resize(out_dim);
-    dst_selecte_rows.mutable_value()->mutable_data(out_place,
-                                                   pre_in.value().type());
-    Tensor *out_tensor = dst_selecte_rows.mutable_value();
+    dst_selecte_rows->mutable_value()->Resize(out_dim);
+    dst_selecte_rows->mutable_value()->mutable_data(out_place,
+                                                    pre_in.value().type());
+    Tensor *out_tensor = dst_selecte_rows->mutable_value();
 
     // copy
     int s = 0, e = 0;
