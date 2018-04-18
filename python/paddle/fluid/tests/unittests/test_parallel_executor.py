@@ -15,7 +15,6 @@
 import numpy
 import unittest
 
-import paddle.fluid as fluid
 import paddle
 import paddle.dataset.mnist as mnist
 import paddle.dataset.wmt16 as wmt16
@@ -510,10 +509,9 @@ class TestTransformer(TestParallelExecutorBase):
 
 
 class ParallelExecutorTestingDuringTraining(unittest.TestCase):
-    def test_parallel_testing(self):
+    def main(self):
         main = fluid.Program()
         startup = fluid.Program()
-        startup.random_seed = 1
         with fluid.program_guard(main, startup):
             loss = simple_fc_net(True)
             test_program = main.clone(for_test=True)
@@ -539,7 +537,7 @@ class ParallelExecutorTestingDuringTraining(unittest.TestCase):
                 main_program=test_program,
                 share_vars_from=train_exe)
 
-            for i in xrange(5):
+            for i in xrange(100):
                 test_loss, = test_exe.run([loss.name], feed=feed_dict)
                 test_loss = numpy.array(test_loss)
 
@@ -550,6 +548,10 @@ class ParallelExecutorTestingDuringTraining(unittest.TestCase):
                         train_loss, test_loss, atol=1e-8),
                     "Train loss: " + str(train_loss) + "\n Test loss:" +
                     str(test_loss))
+
+    def test_main(self):
+        for i in xrange(100):
+            self.main()
 
 
 import paddle.dataset.conll05 as conll05
