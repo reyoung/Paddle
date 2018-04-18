@@ -543,11 +543,15 @@ class ParallelExecutorTestingDuringTraining(unittest.TestCase):
 
                 train_loss, = train_exe.run([loss.name], feed=feed_dict)
                 train_loss = numpy.array(train_loss)
-                self.assertTrue(
-                    numpy.allclose(
-                        train_loss, test_loss, atol=1e-8),
-                    "Train loss: " + str(train_loss) + "\n Test loss:" +
-                    str(test_loss))
+
+                if numpy.allclose(train_loss, test_loss, atol=1e-8):
+                    print 'OK'
+                else:
+                    self.assertTrue(
+                        numpy.allclose(
+                            train_loss, test_loss, atol=1e-8),
+                        "Train loss: " + str(train_loss) + "\n Test loss:" +
+                        str(test_loss))
 
     def test_main(self):
         for i in xrange(100):
