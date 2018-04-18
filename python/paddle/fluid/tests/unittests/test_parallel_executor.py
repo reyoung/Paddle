@@ -632,7 +632,7 @@ def db_lstm(word, predicate, ctx_n2, ctx_n1, ctx_0, ctx_p1, ctx_p2, mark,
 
 
 class TestCRFModel(unittest.TestCase):
-    def test_all(self):
+    def main(self):
         main = fluid.Program()
         startup = fluid.Program()
         with fluid.program_guard(main, startup):
@@ -694,3 +694,10 @@ class TestCRFModel(unittest.TestCase):
                 print map(numpy.array,
                           pe.run(feed=feeder.feed(cur_batch),
                                  fetch_list=[avg_cost.name]))[0]
+
+    def test_all(self):
+        for i in xrange(100):
+            try:
+                self.main()
+            except StopIteration:
+                continue
