@@ -689,7 +689,7 @@ class TestCRFModel(unittest.TestCase):
                 place=fluid.CPUPlace())
 
             data = train_data()
-            for i in xrange(10):
+            for i in xrange(1000):
                 cur_batch = next(data)
                 print map(numpy.array,
                           pe.run(feed=feeder.feed(cur_batch),
