@@ -75,20 +75,26 @@ class BestFitAllocatorPrivate {
   void* Alloc(size_t unaligned_size) {
     size_t aligned_size = Align(unaligned_size, page_size_);
     std::lock_guard<std::mutex> guard(mutex_);
-    auto it = freed_blocks_.lower_bound(aligned_size);
-    if (it == freed_blocks_.end()) {
+    auto it = Allocate(aligned_size);
+    used_blocks_.emplace(it->get()->ptr_, it);
+    return it->get()->ptr_;
+  }
+
+  list_node_it Allocate(size_t aligned_size) {
+    auto tree_it = freed_blocks_.lower_bound(aligned_size);
+    if (tree_it == freed_blocks_.end()) {
       VLOG(10) << "Cannot alloc " << aligned_size;
-      return nullptr;
+      return block_list_.end();
     }
 
-    auto* free_block = it->second->get();
+    auto free_node = tree_it->second;
+    auto* free_block = free_node->get();
 
     if (free_block->size_ ==
         aligned_size) {  // special case, free_block is exactly good.
-      used_blocks_.emplace(free_block->ptr_, it->second);
       free_block->tree_node_ = freed_blocks_.end();
-      freed_blocks_.erase(it);
-      return free_block->ptr_;
+      freed_blocks_.erase(tree_it);
+      return free_node;
     }
 
     auto* new_block = new Block(aligned_size);
@@ -96,11 +102,12 @@ class BestFitAllocatorPrivate {
     new_block->tree_node_ = freed_blocks_.end();
     reinterpret_cast<int8_t*&>(free_block->ptr_) += aligned_size;
     free_block->size_ -= aligned_size;
+    freed_blocks_.erase(tree_it);
+    free_block->tree_node_ =
+        freed_blocks_.emplace(free_block->size_, free_node);
 
-    // Insert new_block before it->second.
-    used_blocks_.emplace(new_block->ptr_,
-                         block_list_.emplace(it->second, new_block));
-    return new_block->ptr_;
+    // Insert new_block before free_node.
+    return block_list_.emplace(free_node, new_block);
   }
 
   // Time complexity O(1)
