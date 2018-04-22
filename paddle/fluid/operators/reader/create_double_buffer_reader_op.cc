@@ -186,6 +186,7 @@ void DoubleBufferReader::PrefetchThreadFunc() {
     }
 
     auto& cpu_batch = cpu_tensor_cache_[write_pos_];
+    cpu_batch.clear();
     reader_->ReadNext(&cpu_batch);
     if (cpu_batch.empty()) {
       // The underlying reader have no next data.
@@ -194,6 +195,7 @@ void DoubleBufferReader::PrefetchThreadFunc() {
     if (platform::is_gpu_place(place_)) {
       auto& gpu_batch = gpu_tensor_cache_[write_pos_];
       auto* gpu_ctx = ctxs_[write_pos_].get();
+      gpu_batch.clear();
       gpu_batch.resize(cpu_batch.size());
       for (size_t i = 0; i < cpu_batch.size(); ++i) {
         framework::TensorCopy(cpu_batch[i], place_, *gpu_ctx, &gpu_batch[i]);
@@ -204,6 +206,7 @@ void DoubleBufferReader::PrefetchThreadFunc() {
     ++buf_size_;
     read_cv_.notify_one();
   }
+  read_cv_.notify_one();
   end_of_read_ = true;
   VLOG(5) << "Prefetch thread terminates.";
 }
