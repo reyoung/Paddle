@@ -77,6 +77,7 @@ class BestFitAllocatorPrivate {
     std::lock_guard<std::mutex> guard(mutex_);
     auto it = Allocate(aligned_size);
     used_blocks_.emplace(it->get()->ptr_, it);
+    VLOG(10) << "Insert ptr " << it->get()->ptr_;
     return it->get()->ptr_;
   }
 
@@ -112,6 +113,7 @@ class BestFitAllocatorPrivate {
 
   // Time complexity O(1)
   void Free(void* ptr) {
+    VLOG(3) << "Free ptr " << ptr;
     std::lock_guard<std::mutex> guard(mutex_);
     list_node_it to_free_node;
     {
