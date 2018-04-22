@@ -17,22 +17,37 @@ limitations under the License. */
 #include "glog/logging.h"
 
 #include "paddle/fluid/memory/detail/buddy_allocator.h"
+#include "paddle/fluid/memory/detail/pooled_allocator.h"
 #include "paddle/fluid/memory/detail/system_allocator.h"
 #include "paddle/fluid/platform/gpu_info.h"
 
 DECLARE_double(fraction_of_gpu_memory_to_use);
+
+enum kAllocatorStrategy { kBuddyAllocator = 0, kPooledAllocator };
+
+DEFINE_int32(allocator_strategy, kBuddyAllocator, "Allocator Strategy.");
 
 namespace paddle {
 namespace memory {
 
 using BuddyAllocator = detail::BuddyAllocator;
 
-BuddyAllocator* GetCPUBuddyAllocator() {
-  static detail::BuddyAllocator* a = nullptr;
+detail::AllocatorBase* GetCPUAllocator() {
+  static detail::AllocatorBase* a = nullptr;
   if (a == nullptr) {
-    a = new detail::BuddyAllocator(new detail::CPUAllocator,
-                                   platform::CpuMinChunkSize(),
-                                   platform::CpuMaxChunkSize());
+    if (FLAGS_allocator_strategy == kBuddyAllocator) {
+      a = new detail::BuddyAllocator(new detail::CPUAllocator(),
+                                     platform::CpuMinChunkSize(),
+                                     platform::CpuMaxChunkSize());
+    } else if (FLAGS_allocator_strategy == kPooledAllocator) {
+      a = new detail::PooledAllocator(new detail::CPUAllocator(),
+                                      platform::CpuMinChunkSize());
+    } else {
+      PADDLE_THROW(
+          "FLAGS_allocator_strategy is wrong, only support %d --> "
+          "BuddyAllocator, %d --> PooledAllocator",
+          kBuddyAllocator, kPooledAllocator);
+    }
   }
   return a;
 }
@@ -40,7 +55,7 @@ BuddyAllocator* GetCPUBuddyAllocator() {
 template <>
 void* Alloc<platform::CPUPlace>(platform::CPUPlace place, size_t size) {
   VLOG(10) << "Allocate " << size << " bytes on " << platform::Place(place);
-  void* p = GetCPUBuddyAllocator()->Alloc(size);
+  void* p = GetCPUAllocator()->Alloc(size);
   VLOG(10) << "  pointer=" << p;
   return p;
 }
@@ -48,48 +63,58 @@ void* Alloc<platform::CPUPlace>(platform::CPUPlace place, size_t size) {
 template <>
 void Free<platform::CPUPlace>(platform::CPUPlace place, void* p) {
   VLOG(10) << "Free pointer=" << p << " on " << platform::Place(place);
-  GetCPUBuddyAllocator()->Free(p);
+  GetCPUAllocator()->Free(p);
 }
 
 template <>
 size_t Used<platform::CPUPlace>(platform::CPUPlace place) {
-  return GetCPUBuddyAllocator()->Used();
+  return GetCPUAllocator()->Used();
 }
 
 #ifdef PADDLE_WITH_CUDA
 
-BuddyAllocator* GetGPUBuddyAllocator(int gpu_id) {
-  static BuddyAllocator** as = NULL;
+detail::AllocatorBase* GetGPUAllocator(int gpu_id) {
+  static detail::AllocatorBase** as = NULL;
   if (as == NULL) {
     int gpu_num = platform::GetCUDADeviceCount();
-    as = new BuddyAllocator*[gpu_num];
+    as = new detail::AllocatorBase*[gpu_num];
     for (int gpu = 0; gpu < gpu_num; gpu++) {
       as[gpu] = nullptr;
     }
   }
   platform::SetDeviceId(gpu_id);
   if (!as[gpu_id]) {
-    as[gpu_id] = new BuddyAllocator(new detail::GPUAllocator(gpu_id),
-                                    platform::GpuMinChunkSize(),
-                                    platform::GpuMaxChunkSize());
-    VLOG(10) << "\n\nNOTE: each GPU device use "
-             << FLAGS_fraction_of_gpu_memory_to_use * 100
-             << "% of GPU memory.\n"
-             << "You can set GFlags environment variable '"
-             << "FLAGS_fraction_of_gpu_memory_to_use"
-             << "' to change the fraction of GPU usage.\n\n";
+    if (FLAGS_allocator_strategy == kBuddyAllocator) {
+      as[gpu_id] = new BuddyAllocator(new detail::GPUAllocator(gpu_id),
+                                      platform::GpuMinChunkSize(),
+                                      platform::GpuMaxChunkSize());
+      VLOG(10) << "\n\nNOTE: each GPU device use "
+               << FLAGS_fraction_of_gpu_memory_to_use * 100
+               << "% of GPU memory.\n"
+               << "You can set GFlags environment variable '"
+               << "FLAGS_fraction_of_gpu_memory_to_use"
+               << "' to change the fraction of GPU usage.\n\n";
+    } else if (FLAGS_allocator_strategy == kPooledAllocator) {
+      as[gpu_id] = new detail::PooledAllocator(new detail::GPUAllocator(gpu_id),
+                                               platform::GpuMinChunkSize());
+    } else {
+      PADDLE_THROW(
+          "FLAGS_allocator_strategy is wrong, only support %d --> "
+          "BuddyAllocator, %d --> PooledAllocator",
+          kBuddyAllocator, kPooledAllocator);
+    }
   }
   return as[gpu_id];
 }
 
 template <>
 size_t Used<platform::CUDAPlace>(platform::CUDAPlace place) {
-  return GetGPUBuddyAllocator(place.device)->Used();
+  return GetGPUAllocator(place.device)->Used();
 }
 
 template <>
 void* Alloc<platform::CUDAPlace>(platform::CUDAPlace place, size_t size) {
-  auto* buddy_allocator = GetGPUBuddyAllocator(place.device);
+  auto* buddy_allocator = GetGPUAllocator(place.device);
   auto* ptr = buddy_allocator->Alloc(size);
   if (ptr == nullptr) {
     int cur_dev = platform::GetCurrentDeviceId();
@@ -109,7 +134,7 @@ void* Alloc<platform::CUDAPlace>(platform::CUDAPlace place, size_t size) {
 
 template <>
 void Free<platform::CUDAPlace>(platform::CUDAPlace place, void* p) {
-  GetGPUBuddyAllocator(place.device)->Free(p);
+  GetGPUAllocator(place.device)->Free(p);
 }
 
 BuddyAllocator* GetCUDAPinnedBuddyAllocator() {

@@ -20,6 +20,7 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 
+#include "paddle/fluid/memory/detail/allocator_base.h"
 #include "paddle/fluid/memory/detail/memory_block.h"
 #include "paddle/fluid/memory/detail/system_allocator.h"
 #include "paddle/fluid/platform/assert.h"
@@ -30,7 +31,7 @@ namespace paddle {
 namespace memory {
 namespace detail {
 
-class BuddyAllocator {
+class BuddyAllocator : public AllocatorBase {
  public:
   BuddyAllocator(SystemAllocator* system_allocator, size_t min_chunk_size,
                  size_t max_chunk_size);
@@ -38,14 +39,9 @@ class BuddyAllocator {
   ~BuddyAllocator();
 
  public:
-  void* Alloc(size_t unaligned_size);
-  void Free(void* ptr);
-  size_t Used();
-
- public:
-  // Disable copy and assignment
-  BuddyAllocator(const BuddyAllocator&) = delete;
-  BuddyAllocator& operator=(const BuddyAllocator&) = delete;
+  void* Alloc(size_t unaligned_size) override;
+  void Free(void* ptr) override;
+  size_t Used() override;
 
  private:
   // Tuple (allocator index, memory size, memory address)
