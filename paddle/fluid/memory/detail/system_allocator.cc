@@ -102,6 +102,7 @@ void* GPUAllocator::Alloc(size_t* index, size_t size) {
         << " MB GPU memory. Please shrink FLAGS_fraction_of_gpu_memory_to_use "
            "environment variable to a lower value. Current value is "
         << FLAGS_fraction_of_gpu_memory_to_use;
+    cudaGetLastError();
     return nullptr;
   }
 }

@@ -94,7 +94,6 @@ class PooledAllocatorPrivate {
       if (res != nullptr) {
         return res;
       }
-
       lock.lock();
       if (pooled_memory.empty()) {
         return nullptr;
