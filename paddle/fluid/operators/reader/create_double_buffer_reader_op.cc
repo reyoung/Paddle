@@ -181,8 +181,9 @@ void DoubleBufferReader::PrefetchThreadFunc() {
   while (true) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
-      write_cv_.wait(
-          lock, [this] { return buf_size_ != this->cpu_tensor_cache_.size(); });
+      write_cv_.wait(lock, [this] {
+        return buf_size_ != this->cpu_tensor_cache_.size() - 1;
+      });
     }
 
     auto& cpu_batch = cpu_tensor_cache_[write_pos_];
