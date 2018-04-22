@@ -77,6 +77,7 @@ class BestFitAllocatorPrivate {
     std::lock_guard<std::mutex> guard(mutex_);
     auto it = freed_blocks_.lower_bound(aligned_size);
     if (it == freed_blocks_.end()) {
+      VLOG(10) << "Cannot alloc " << aligned_size;
       return nullptr;
     }
 
@@ -122,28 +123,49 @@ class BestFitAllocatorPrivate {
     bool is_right_free = IsNodeFree(right_node);
     if (is_left_free && is_right_free) {  // merge left and right
       // Erase right node in freed_block
-      freed_blocks_.erase(right_node->get()->tree_node_);
-      left_node->get()->size_ +=
-          to_free_block->size_ + right_node->get()->size_;
+      auto* left_block = left_node->get();
+      auto* right_block = right_node->get();
+      left_block->size_ += to_free_block->size_ + right_block->size_;
 
       // erase to_free_node and right_node in list
       block_list_.erase(right_node);
       block_list_.erase(to_free_node);
+
+      // adjust tree.
+      freed_blocks_.erase(left_block->tree_node_);
+      freed_blocks_.erase(right_block->tree_node_);
+      left_block->tree_node_ =
+          freed_blocks_.emplace(left_block->size_, left_node);
+
     } else if (!is_left_free && is_right_free) {
       // extend right node
-      right_node->get()->ptr_ = to_free_node->get()->ptr_;
-      right_node->get()->size_ += to_free_node->get()->size_;
+      auto* right_block = right_node->get();
+      right_block->ptr_ = to_free_node->get()->ptr_;
+      right_block->size_ += to_free_node->get()->size_;
 
       // erase current node
       block_list_.erase(to_free_node);
+
+      // adjust tree.
+      freed_blocks_.erase(right_block->tree_node_);
+      right_block->tree_node_ =
+          freed_blocks_.emplace(right_block->size_, right_node);
+
     } else if (is_left_free && !is_right_free) {
       // extend left node
-      left_node->get()->size_ += to_free_node->get()->size_;
+      auto* left_block = left_node->get();
+      left_block->size_ += to_free_node->get()->size_;
 
       // erase current node
       block_list_.erase(to_free_node);
+
+      // adjust tree.
+      freed_blocks_.erase(left_block->tree_node_);
+      left_block->tree_node_ =
+          freed_blocks_.emplace(left_block->size_, left_node);
+
     } else {  // not is_left_free and not is_right free
-      // insert to_free_block to freed_blocks_;
+      // adjust tree
       to_free_block->tree_node_ =
           freed_blocks_.emplace(to_free_block->size_, to_free_node);
     }

@@ -93,6 +93,7 @@ detail::AllocatorBase* GetGPUAllocator(int gpu_id) {
   }
   platform::SetDeviceId(gpu_id);
   if (!as[gpu_id]) {
+    VLOG(3) << "Use allocator strategy " << FLAGS_allocator_strategy;
     if (FLAGS_allocator_strategy == kBuddyAllocator) {
       as[gpu_id] = new BuddyAllocator(new detail::GPUAllocator(gpu_id),
                                       platform::GpuMinChunkSize(),
