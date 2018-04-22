@@ -16,6 +16,7 @@ limitations under the License. */
 
 #include "glog/logging.h"
 
+#include "paddle/fluid/memory/detail/best_fit_allocator.h"
 #include "paddle/fluid/memory/detail/buddy_allocator.h"
 #include "paddle/fluid/memory/detail/pooled_allocator.h"
 #include "paddle/fluid/memory/detail/system_allocator.h"
@@ -23,7 +24,11 @@ limitations under the License. */
 
 DECLARE_double(fraction_of_gpu_memory_to_use);
 
-enum kAllocatorStrategy { kBuddyAllocator = 0, kPooledAllocator };
+enum kAllocatorStrategy {
+  kBuddyAllocator = 0,
+  kPooledAllocator,
+  kBestFitAllocator
+};
 
 DEFINE_int32(allocator_strategy, kBuddyAllocator, "Allocator Strategy.");
 
@@ -42,6 +47,10 @@ detail::AllocatorBase* GetCPUAllocator() {
     } else if (FLAGS_allocator_strategy == kPooledAllocator) {
       a = new detail::PooledAllocator(new detail::CPUAllocator(),
                                       platform::CpuMinChunkSize());
+    } else if (FLAGS_allocator_strategy == kBestFitAllocator) {
+      a = new detail::BuddyAllocator(new detail::CPUAllocator(),
+                                     platform::CpuMinChunkSize(),
+                                     platform::CpuMaxChunkSize());
     } else {
       PADDLE_THROW(
           "FLAGS_allocator_strategy is wrong, only support %d --> "
@@ -97,6 +106,10 @@ detail::AllocatorBase* GetGPUAllocator(int gpu_id) {
     } else if (FLAGS_allocator_strategy == kPooledAllocator) {
       as[gpu_id] = new detail::PooledAllocator(new detail::GPUAllocator(gpu_id),
                                                platform::GpuMinChunkSize());
+    } else if (FLAGS_allocator_strategy == kBestFitAllocator) {
+      as[gpu_id] = new detail::BestFitAllocator(
+          new detail::GPUAllocator(gpu_id), platform::GpuMinChunkSize(),
+          platform::GpuMaxChunkSize());
     } else {
       PADDLE_THROW(
           "FLAGS_allocator_strategy is wrong, only support %d --> "
