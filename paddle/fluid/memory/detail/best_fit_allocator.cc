@@ -84,6 +84,8 @@ class BestFitAllocatorPrivate {
 
     if (free_block->size_ ==
         aligned_size) {  // special case, free_block is exactly good.
+      used_blocks_.emplace(free_block->ptr_, it->second);
+      free_block->tree_node_ = freed_blocks_.end();
       freed_blocks_.erase(it);
       return free_block->ptr_;
     }
