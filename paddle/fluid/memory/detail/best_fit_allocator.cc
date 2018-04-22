@@ -109,6 +109,9 @@ class BestFitAllocatorPrivate {
     list_node_it to_free_node;
     {
       auto it = used_blocks_.find(ptr);
+      if (it == used_blocks_.end()) {
+        VLOG(10) << "Cannot find pointer " << ptr;
+      }
       PADDLE_ENFORCE(it != used_blocks_.end());
       to_free_node = it->second;
       used_blocks_.erase(it);
