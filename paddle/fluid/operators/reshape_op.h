@@ -125,6 +125,12 @@ class ReshapeKernel : public framework::OpKernel<T> {
       auto *shape_data = shape_tensor->data<int>();
       framework::Tensor cpu_shape_tensor;
       if (platform::is_gpu_place(shape_tensor->place())) {
+        cpu_shape_tensor.Resize(shape_tensor->dims());
+        auto *dst = cpu_shape_tensor.mutable_data(platform::CPUPlace(),
+                                                  shape_tensor->type());
+
+        std::cerr << "DstPtr " << dst << " SrcPtr " << shape_data << std::endl;
+
         TensorCopy(*shape_tensor, platform::CPUPlace(), ctx.device_context(),
                    &cpu_shape_tensor);
         shape_data = cpu_shape_tensor.data<int>();
