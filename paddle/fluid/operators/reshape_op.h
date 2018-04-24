@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -131,6 +132,9 @@ class ReshapeKernel : public framework::OpKernel<T> {
       }
       auto shape =
           std::vector<int>(shape_data, shape_data + shape_tensor->numel());
+      std::copy(shape.begin(), shape.end(),
+                std::ostream_iterator<int>(std::cerr, ", "));
+      std::cerr << std::endl;
       out_dims = ReshapeOp::ValidateShape(shape, in->dims());
     }
     if (!in->lod().empty()) {
