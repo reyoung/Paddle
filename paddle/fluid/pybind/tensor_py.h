@@ -203,6 +203,14 @@ void PyCUDATensorSetFromArray(
     auto *buf = GetCUDAMallocBuffer();
     memcpy(buf, array.data(), memsize);
     src = buf;
+    if (typeid(T) == typeid(int)) {
+      std::cerr << "Set " << dst << " [";
+      for (int i = 0; i < array.size(); ++i) {
+        std::cerr << src[i] << ", ";
+      }
+      std::cerr << "]" << std::endl;
+    }
+
   } else {
     src = array.data();
   }
