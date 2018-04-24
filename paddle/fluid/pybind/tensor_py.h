@@ -206,7 +206,7 @@ void PyCUDATensorSetFromArray(
     if (typeid(T) == typeid(int)) {
       std::cerr << "Set " << dst << " [";
       for (int i = 0; i < array.size(); ++i) {
-        std::cerr << src[i] << ", ";
+        std::cerr << array.data()[i] << ", ";
       }
       std::cerr << "]" << std::endl;
     }
