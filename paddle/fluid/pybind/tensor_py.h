@@ -185,6 +185,7 @@ void PyCUDATensorSetFromArray(
   self->Resize(framework::make_ddim(dims));
   auto *dst = self->mutable_data<T>(place);
 
+  cudaSetDevice(place.device);
   paddle::platform::GpuMemcpySync(dst, array.data(), sizeof(T) * array.size(),
                                   cudaMemcpyHostToDevice);
 }
@@ -206,6 +207,7 @@ void PyCUDATensorSetFromArray(
 
   self->Resize(framework::make_ddim(dims));
   auto *dst = self->mutable_data<platform::float16>(place);
+  cudaSetDevice(place.device);
   paddle::platform::GpuMemcpySync(dst, array.data(),
                                   sizeof(uint16_t) * array.size(),
                                   cudaMemcpyHostToDevice);
