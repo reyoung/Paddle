@@ -16,7 +16,9 @@ limitations under the License. */
 #include <Python.h>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <vector>
+
 #include "paddle/fluid/framework/lod_tensor.h"
 #include "paddle/fluid/memory/memcpy.h"
 #include "paddle/fluid/platform/device_context.h"
@@ -186,10 +188,12 @@ void PyCUDATensorSetFromArray(
   auto *dst = self->mutable_data<T>(place);
 
   cudaSetDevice(place.device);
-  for (size_t i = 0; i < array.size(); ++i) {
-    std::cerr << array.data()[i] << ", ";
+  if (std::is_same<T, int>::value) {
+    for (size_t i = 0; i < array.size(); ++i) {
+      std::cerr << array.data()[i] << ", ";
+    }
+    std::cerr << std::endl;
   }
-  std::cerr << std::endl;
   paddle::platform::GpuMemcpySync(dst, array.data(), sizeof(T) * array.size(),
                                   cudaMemcpyHostToDevice);
 }
