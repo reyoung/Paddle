@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include <paddle/fluid/platform/gpu_info.h>
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -123,21 +124,16 @@ class ReshapeKernel : public framework::OpKernel<T> {
 
     if (shape_tensor) {
       auto *shape_data = shape_tensor->data<int>();
-      framework::Tensor cpu_shape_tensor;
+      std::vector<int> shape;
       if (platform::is_gpu_place(shape_tensor->place())) {
-        cpu_shape_tensor.Resize(shape_tensor->dims());
-        auto *dst = cpu_shape_tensor.mutable_data(platform::CPUPlace(),
-                                                  shape_tensor->type());
-
-        std::cerr << "DstPtr " << dst << " SrcPtr " << shape_data << std::endl;
-
-        TensorCopy(*shape_tensor, platform::CPUPlace(), ctx.device_context(),
-                   &cpu_shape_tensor);
-        shape_data = cpu_shape_tensor.data<int>();
-        ctx.device_context().Wait();
+        shape.resize(static_cast<size_t>(shape_tensor->numel()));
+        platform::GpuMemcpySync(&shape[0], shape_data,
+                                shape_tensor->memory_size(),
+                                cudaMemcpyDeviceToHost);
+      } else {
+        shape =
+            std::vector<int>(shape_data, shape_data + shape_tensor->numel());
       }
-      auto shape =
-          std::vector<int>(shape_data, shape_data + shape_tensor->numel());
       std::cerr << shape_tensor->data<int>() << ": ";
       std::copy(shape.begin(), shape.end(),
                 std::ostream_iterator<int>(std::cerr, ", "));
