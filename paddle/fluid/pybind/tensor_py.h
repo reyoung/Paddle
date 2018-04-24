@@ -186,6 +186,10 @@ void PyCUDATensorSetFromArray(
   auto *dst = self->mutable_data<T>(place);
 
   cudaSetDevice(place.device);
+  for (size_t i = 0; i < array.size(); ++i) {
+    std::cerr << array.data()[i] << ", ";
+  }
+  std::cerr << std::endl;
   paddle::platform::GpuMemcpySync(dst, array.data(), sizeof(T) * array.size(),
                                   cudaMemcpyHostToDevice);
 }
