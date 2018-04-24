@@ -127,6 +127,7 @@ class ReshapeKernel : public framework::OpKernel<T> {
       std::vector<int> shape;
       if (platform::is_gpu_place(shape_tensor->place())) {
         shape.resize(static_cast<size_t>(shape_tensor->numel()));
+        std::cerr << "Dst " << &shape[0] << "Src " << shape_data << std::endl;
         platform::GpuMemcpySync(&shape[0], shape_data,
                                 shape_tensor->memory_size(),
                                 cudaMemcpyDeviceToHost);
