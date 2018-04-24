@@ -127,6 +127,7 @@ class ReshapeKernel : public framework::OpKernel<T> {
         LOG(INFO) << "";
         TensorCopy(*shape_tensor, platform::CPUPlace(), ctx.device_context(),
                    &cpu_shape_tensor);
+        LOG(INFO) << "";
         shape_data = cpu_shape_tensor.data<int>();
         ctx.device_context().Wait();
       }
@@ -149,6 +150,7 @@ class ReshapeKernel : public framework::OpKernel<T> {
       out->mutable_data<T>(ctx.GetPlace());
       LOG(INFO) << "";
       framework::TensorCopy(*in, ctx.GetPlace(), ctx.device_context(), out);
+      LOG(INFO) << "";
       ctx.device_context().Wait();
       // TensorCopy will resize to in_dims.
       out->Resize(out_dims);
