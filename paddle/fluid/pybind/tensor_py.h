@@ -172,6 +172,16 @@ void PyCPUTensorSetFromArray(
 }
 
 #ifdef PADDLE_WITH_CUDA
+
+static void *GetCUDAMallocBuffer() {
+  // Since PIL, there is no need to lock
+  static void *buffer = nullptr;
+  if (buffer == nullptr) {
+    PADDLE_ENFORCE(cudaMallocHost(&buffer, 64 * 1024));
+  }
+  return buffer;
+}
+
 template <typename T>
 void PyCUDATensorSetFromArray(
     framework::Tensor *self,
@@ -181,21 +191,22 @@ void PyCUDATensorSetFromArray(
   std::vector<int64_t> dims;
   dims.reserve(array.ndim());
   for (size_t i = 0; i < array.ndim(); ++i) {
-    dims.push_back(static_cast<int>(array.shape()[i]));
+    dims.push_back(static_cast<int64_t>(array.shape()[i]));
   }
 
   self->Resize(framework::make_ddim(dims));
   auto *dst = self->mutable_data<T>(place);
 
-  cudaSetDevice(place.device);
-  if (std::is_same<T, int>::value) {
-    for (size_t i = 0; i < array.size(); ++i) {
-      std::cerr << array.data()[i] << ", ";
-    }
-    std::cerr << std::endl;
+  size_t memsize = sizeof(T) * array.size();
+  const void *src;
+  if (memsize < 64 * 1024) {  // Less than 64K
+    auto *buf = GetCUDAMallocBuffer();
+    memcpy(buf, array.data(), memsize);
+    src = buf;
+  } else {
+    src = array.data();
   }
-  paddle::platform::GpuMemcpySync(dst, array.data(), sizeof(T) * array.size(),
-                                  cudaMemcpyHostToDevice);
+  paddle::platform::GpuMemcpySync(dst, src, memsize, cudaMemcpyHostToDevice);
 }
 
 template <>
