@@ -123,11 +123,9 @@ class ReshapeKernel : public framework::OpKernel<T> {
     if (shape_tensor) {
       auto *shape_data = shape_tensor->data<int>();
       framework::Tensor cpu_shape_tensor;
-      if (platform::is_gpu_place(ctx.GetPlace())) {
-        LOG(INFO) << shape_tensor->memory_size();
+      if (platform::is_gpu_place(shape_tensor->place())) {
         TensorCopy(*shape_tensor, platform::CPUPlace(), ctx.device_context(),
                    &cpu_shape_tensor);
-        LOG(INFO) << "";
         shape_data = cpu_shape_tensor.data<int>();
         ctx.device_context().Wait();
       }
