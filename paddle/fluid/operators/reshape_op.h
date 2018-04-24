@@ -125,13 +125,14 @@ class ReshapeKernel : public framework::OpKernel<T> {
       auto *shape_data = shape_tensor->data<int>();
       framework::Tensor cpu_shape_tensor;
       if (platform::is_gpu_place(shape_tensor->place())) {
-        TensorCopy(*shape_tensor, platform::CUDAPinnedPlace(),
-                   ctx.device_context(), &cpu_shape_tensor);
+        TensorCopy(*shape_tensor, platform::CPUPlace(), ctx.device_context(),
+                   &cpu_shape_tensor);
         shape_data = cpu_shape_tensor.data<int>();
         ctx.device_context().Wait();
       }
       auto shape =
           std::vector<int>(shape_data, shape_data + shape_tensor->numel());
+      std::cerr << shape_tensor->data<int>() << ": ";
       std::copy(shape.begin(), shape.end(),
                 std::ostream_iterator<int>(std::cerr, ", "));
       std::cerr << std::endl;
