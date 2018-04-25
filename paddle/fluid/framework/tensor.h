@@ -156,6 +156,12 @@ class Tensor {
                               (is_cpu_place(place_) ? "CPU" : "GPU"));
     }
 
+    ~PlaceholderImpl() {
+      if (type_ == typeid(int)) {  // NOLINT
+        std::cerr << "free ptr " << ptr_.get() << std::endl;
+      }
+    }
+
     virtual size_t size() const { return size_; }
     virtual platform::Place place() const { return place_; }
     virtual void* ptr() const { return static_cast<void*>(ptr_.get()); }

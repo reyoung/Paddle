@@ -115,6 +115,8 @@ template <typename DeviceContext, typename T>
 class ReshapeKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext &ctx) const {
+    PADDLE_ENFORCE(cudaSetDevice(0));
+    PADDLE_ENFORCE(cudaDeviceSynchronize());
     auto *out = ctx.Output<framework::LoDTensor>("Out");
     auto *in = ctx.Input<framework::LoDTensor>("X");
     auto *shape_tensor = ctx.Input<framework::LoDTensor>("Shape");
