@@ -94,7 +94,11 @@ FeedFetchList ThreadedSSAGraphExecutor::Run(
   std::unordered_set<std::unique_ptr<VarHandleBase>> fetch_dependencies;
   for (size_t i = 0; i < fetch_tensors.size(); ++i) {
     auto &var_name = fetch_tensors[i];
-    auto &vars = fetched_vars.at(var_name);
+    auto it = fetched_vars.find(var_name);
+    if (it == fetched_vars.end()) {
+      PADDLE_THROW("Cannot find variable %s", var_name);
+    }
+    auto &vars = it->second;
     auto *op = new FetchOpHandle(&fetch_data, i, &local_scopes_);
     fetch_ops.emplace_back(op);
 
