@@ -158,7 +158,7 @@ class Tensor {
 
     ~PlaceholderImpl() {
       if (type_ == typeid(int)) {  // NOLINT
-        std::cerr << "free ptr " << ptr_.get() << std::endl;
+        std::cerr << "free ptr " << static_cast<void*>(ptr_.get()) << std::endl;
       }
     }
 
