@@ -37,9 +37,9 @@ class MatMulOp : public framework::OperatorWithKernel {
     auto dim_x = context->GetInputDim("X");
     auto dim_y = context->GetInputDim("Y");
 
-    auto mat_dim_x = math::GetMatDim(GetXDim(dim_x), 0,
+    auto mat_dim_x = math::GetMatDim(ReshapeVectorToRowMatrix(dim_x), 0,
                                      context->Attrs().Get<bool>("transpose_X"));
-    auto mat_dim_y = math::GetMatDim(GetYDim(dim_y), 0,
+    auto mat_dim_y = math::GetMatDim(ReshapeVectorToColumnMatrix(dim_y), 0,
                                      context->Attrs().Get<bool>("transpose_Y"));
 
     PADDLE_ENFORCE_EQ(mat_dim_x.width_, mat_dim_y.height_);
