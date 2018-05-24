@@ -182,7 +182,7 @@ void ParallelExecutor::Run(const std::vector<std::string> &fetch_tensors,
         continue;
       }
 
-      if (std::get<2>(name_type_pair)) {  // Persistable
+      if (true) {  // Persistable
         InitializeVariable(scope->Var(std::get<0>(name_type_pair)),
                            std::get<1>(name_type_pair));
       } else {
