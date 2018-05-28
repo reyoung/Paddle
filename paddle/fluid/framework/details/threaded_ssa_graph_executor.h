@@ -94,14 +94,21 @@ class FasterSSAGraphExecutor : public SSAGraphExecutor {
     OpHandleBase *op_{nullptr};
     std::unordered_map<OpHandleBase *, std::atomic<size_t>> *pending_ops_{
         nullptr};
-    std::atomic<size_t> *op_counter_{nullptr};
+    size_t *op_counter_{nullptr};
+    std::mutex *op_counter_mtx_{nullptr};
+    std::condition_variable *op_counter_cv_{nullptr};
 
     JobItem() {}
     JobItem(
         OpHandleBase *op,
         std::unordered_map<OpHandleBase *, std::atomic<size_t>> *pending_ops,
-        std::atomic<size_t> *op_counter)
-        : op_(op), pending_ops_(pending_ops), op_counter_(op_counter) {}
+        size_t *op_counter, std::mutex *op_counter_mtx,
+        std::condition_variable *op_counter_cv)
+        : op_(op),
+          pending_ops_(pending_ops),
+          op_counter_(op_counter),
+          op_counter_mtx_(op_counter_mtx),
+          op_counter_cv_(op_counter_cv) {}
   };
 
   void ThreadFunc();
