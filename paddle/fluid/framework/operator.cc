@@ -542,7 +542,7 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
   //   Do selection
   // }
 
-  OpKernelType type(proto::VarType::FP32, ctx);
+  OpKernelType type(proto::VarType::FP32, *dev_ctx);
 
   auto kernel_iter = kernels.find(type);
   if (kernel_iter == kernels.end()) {
