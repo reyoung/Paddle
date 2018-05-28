@@ -16,6 +16,9 @@ limitations under the License. */
 
 #include <algorithm>
 
+#include <chrono>  // NOLINT
+#include <thread>  // NOLINT
+
 #include "paddle/fluid/framework/data_transform.h"
 #include "paddle/fluid/framework/executor.h"
 #include "paddle/fluid/framework/operator.h"
@@ -555,6 +558,8 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
   if (Type() == "fill_constant" || Type() == "gaussian_random" ||
       Type() == "uniform_random") {
     kernel_iter->second->Compute(ExecutionContext(*this, scope, *new_dev_ctx));
+  } else {
+    std::this_thread::sleep_for(std::chrono::microseconds(300));
   }
 
   /*For profiling/benchmark only*/
