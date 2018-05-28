@@ -214,12 +214,7 @@ FasterSSAGraphExecutor::FasterSSAGraphExecutor(
     std::unique_ptr<SSAGraph> &&graph)
     : SSAGraphExecutor(std::move(graph)), strategy_(strategy) {
   for (size_t i = 0; i < strategy.num_threads_; ++i) {
-    cpu_set_t cpu_set;
-    CPU_ZERO(&cpu_set);
-    CPU_SET(i % std::thread::hardware_concurrency(), &cpu_set);
     threads_.emplace_back([this] { this->ThreadFunc(); });
-    pthread_setaffinity_np(threads_.back().native_handle(), sizeof(cpu_set),
-                           &cpu_set);
   }
 }
 void FasterSSAGraphExecutor::ThreadFunc() {
@@ -272,7 +267,7 @@ FeedFetchList FasterSSAGraphExecutor::Run(
   std::mutex op_counter_mtx;
   std::condition_variable op_counter_cv;
   std::unordered_map<OpHandleBase *, std::atomic<size_t>> pending_ops;
-
+  std::atomic<size_t> tmp;
   {  // Send init job to workers
     auto begin = std::chrono::high_resolution_clock::now();
     std::vector<OpHandleBase *> ready_ops;
@@ -284,7 +279,8 @@ FeedFetchList FasterSSAGraphExecutor::Run(
       pending_ops[op.get()] = deps;
     }
     auto duration = std::chrono::high_resolution_clock::now() - begin;
-    VLOG(10) << "Prepare time " << double(duration.count()) / 1000000 << "ms";
+    VLOG(10) << "Atomic<SizeT>::IsLockFree " << tmp.is_lock_free()
+             << " Prepare time " << double(duration.count()) / 1000000 << "ms";
     for (auto *op : ready_ops) {
       jobs_.enqueue(JobItem(op, &pending_ops, &op_counter, &op_counter_mtx,
                             &op_counter_cv));
