@@ -107,7 +107,7 @@ ParallelExecutor::ParallelExecutor(
 #endif
   auto graph = builder.Build(main_program);
 
-  member_->executor_.reset(new details::ThreadedSSAGraphExecutor(
+  member_->executor_.reset(new details::FasterSSAGraphExecutor(
       exec_strategy, member_->local_scopes_, places, std::move(graph)));
 
   // Step 3. Create vars in each scope;

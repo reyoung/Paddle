@@ -207,6 +207,96 @@ void ThreadedSSAGraphExecutor::RunOp(
     op_run();
   }
 }
+FasterSSAGraphExecutor::FasterSSAGraphExecutor(
+    const ExecutionStrategy &strategy, const std::vector<Scope *> &local_scopes,
+    const std::vector<platform::Place> &places,
+    std::unique_ptr<SSAGraph> &&graph)
+    : SSAGraphExecutor(std::move(graph)), strategy_(strategy) {
+  for (size_t i = 0; i < strategy.num_threads_; ++i) {
+    threads_.emplace_back([this] { this->ThreadFunc(); });
+  }
+}
+void FasterSSAGraphExecutor::ThreadFunc() {
+  while (true) {
+    auto job = jobs_.Pop();
+    if (job.op_ == nullptr) {  // End
+      return;
+    }
+
+    size_t run_op_counter = 0;
+    while (job.op_ != nullptr) {
+      job.op_->Run(strategy_.use_event_);
+      ++run_op_counter;
+
+      auto *prev_op = job.op_;
+      job.op_ = nullptr;
+
+      for (auto &out : prev_op->Outputs()) {
+        for (auto *pending_op : out->pending_ops_) {
+          std::atomic<size_t> &deps = job.pending_ops_->at(pending_op);
+          if (deps.fetch_sub(1) == 1) {
+            if (job.op_ == nullptr) {
+              // Pending Op can run right now.
+              job.op_ = pending_op;
+            } else {
+              // Send Pending Op to other threads.
+              jobs_.Push(JobItem(pending_op, job.pending_ops_, job.op_counter_,
+                                 job.op_counter_mtx_, job.op_counter_cv_));
+            }
+          }
+        }
+      }
+    }
+    {
+      std::lock_guard<std::mutex> guard(*job.op_counter_mtx_);
+      *job.op_counter_ += run_op_counter;
+    }
+    job.op_counter_cv_->notify_one();
+  }
+}
+
+FeedFetchList FasterSSAGraphExecutor::Run(
+    const std::vector<std::string> &fetch_tensors) {
+  PADDLE_ENFORCE_EQ(fetch_tensors.size(), 0);
+
+  size_t op_counter{0};
+  std::mutex op_counter_mtx;
+  std::condition_variable op_counter_cv;
+  std::unordered_map<OpHandleBase *, std::atomic<size_t>> pending_ops;
+
+  {  // Send init job to workers
+    std::vector<OpHandleBase *> ready_ops;
+    for (auto &op : graph_->ops_) {
+      size_t deps = op->NotReadyInputSize();
+      if (deps == 0) {
+        ready_ops.emplace_back(op.get());
+      }
+      pending_ops.emplace(op.get(), deps);
+    }
+    for (auto *op : ready_ops) {
+      jobs_.Push(JobItem(op, &pending_ops, &op_counter, &op_counter_mtx,
+                         &op_counter_cv));
+    }
+  }
+
+  {  // Wait all worker done.
+    std::unique_lock<std::mutex> lock(op_counter_mtx);
+    while (op_counter != pending_ops.size()) {
+      op_counter_cv.wait(lock);
+    }
+  }
+
+  return paddle::framework::FeedFetchList();
+}
+FasterSSAGraphExecutor::~FasterSSAGraphExecutor() {
+  for (size_t i = 0; i < strategy_.num_threads_; ++i) {
+    jobs_.Push(JobItem());
+  }
+
+  for (auto &th : threads_) {
+    th.join();
+  }
+}
 }  // namespace details
 }  // namespace framework
 }  // namespace paddle
