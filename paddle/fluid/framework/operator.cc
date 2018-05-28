@@ -593,7 +593,7 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
         var->GetMutable<LoDTensor>()->mutable_data<float>(dev_ctx->GetPlace());
       }
     }
-
+    std::this_thread::sleep_for(std::chrono::microseconds(300));
   } else {
     kernel_iter->second->Compute(ExecutionContext(*this, scope, *new_dev_ctx));
   }
