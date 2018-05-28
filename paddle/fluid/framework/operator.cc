@@ -553,13 +553,49 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
                  KernelTypeToString(type));
   }
 
+  std::unordered_set<std::string> skipped_ops = {"accuracy",
+                                                 "batch_norm",
+                                                 "batch_norm_grad",
+                                                 "conv2d",
+                                                 "conv2d_grad",
+                                                 "cross_entropy",
+                                                 "cross_entropy_grad",
+                                                 "dropout",
+                                                 "dropout_grad",
+                                                 "elementwise_add",
+                                                 "elementwise_add_grad",
+                                                 "elementwise_mul",
+                                                 "elementwise_mul_grad",
+                                                 "fill_zeros_like",
+                                                 "mean",
+                                                 "mean_grad",
+                                                 "momentum",
+                                                 "mul",
+                                                 "mul_grad",
+                                                 "pool2d",
+                                                 "pool2d_grad",
+                                                 "relu",
+                                                 "relu_grad",
+                                                 "scale",
+                                                 "sigmoid",
+                                                 "sigmoid_grad",
+                                                 "softmax",
+                                                 "softmax_grad",
+                                                 "sum",
+                                                 "top_k"};
+
   // do data transform
   auto* new_dev_ctx = pool.Get(type.place_);
-  if (Type() == "fill_constant" || Type() == "gaussian_random" ||
-      Type() == "uniform_random") {
-    kernel_iter->second->Compute(ExecutionContext(*this, scope, *new_dev_ctx));
+  if (skipped_ops.count(Type())) {
+    for (auto& out : OutputVars(true)) {
+      auto* var = scope.FindVar(out);
+      if (var->Type() == typeid(LoDTensor)) {
+        var->GetMutable<LoDTensor>()->mutable_data<float>(dev_ctx->GetPlace());
+      }
+    }
+
   } else {
-    std::this_thread::sleep_for(std::chrono::microseconds(300));
+    kernel_iter->second->Compute(ExecutionContext(*this, scope, *new_dev_ctx));
   }
 
   /*For profiling/benchmark only*/
