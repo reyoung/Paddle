@@ -262,14 +262,12 @@ void FasterSSAGraphExecutor::ThreadFunc() {
 FeedFetchList FasterSSAGraphExecutor::Run(
     const std::vector<std::string> &fetch_tensors) {
   PADDLE_ENFORCE_EQ(fetch_tensors.size(), 0);
-
   size_t op_counter{0};
   std::mutex op_counter_mtx;
   std::condition_variable op_counter_cv;
   std::unordered_map<OpHandleBase *, std::atomic<size_t>> pending_ops;
   std::atomic<size_t> tmp;
   {  // Send init job to workers
-    auto begin = std::chrono::high_resolution_clock::now();
     std::vector<OpHandleBase *> ready_ops;
     for (auto &op : graph_->ops_) {
       size_t deps = op->NotReadyInputSize();
@@ -278,9 +276,6 @@ FeedFetchList FasterSSAGraphExecutor::Run(
       }
       pending_ops[op.get()] = deps;
     }
-    auto duration = std::chrono::high_resolution_clock::now() - begin;
-    VLOG(10) << "Atomic<SizeT>::IsLockFree " << tmp.is_lock_free()
-             << " Prepare time " << double(duration.count()) / 1000000 << "ms";
     for (auto *op : ready_ops) {
       jobs_.enqueue(JobItem(op, &pending_ops, &op_counter, &op_counter_mtx,
                             &op_counter_cv));
@@ -293,7 +288,6 @@ FeedFetchList FasterSSAGraphExecutor::Run(
       op_counter_cv.wait(lock);
     }
   }
-
   return paddle::framework::FeedFetchList();
 }
 FasterSSAGraphExecutor::~FasterSSAGraphExecutor() {
