@@ -553,8 +553,10 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
 
   // do data transform
   auto* new_dev_ctx = pool.Get(expected_kernel_key.place_);
-  kernel_iter->second->Compute(
-      ExecutionContext(*this, scope, *new_dev_ctx));
+  if (Type() == "fill_constant" || Type() == "gaussian_random" ||
+      Type() == "uniform_random") {
+    kernel_iter->second->Compute(ExecutionContext(*this, scope, *new_dev_ctx));
+  }
 
   /*For profiling/benchmark only*/
   if (FLAGS_benchmark) {

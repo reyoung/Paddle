@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "paddle/fluid/framework/details/threaded_ssa_graph_executor.h"
-#include <chrono>   
+#include <chrono>  // NOLINT
 
 namespace paddle {
 namespace framework {
@@ -228,7 +228,7 @@ void FasterSSAGraphExecutor::ThreadFunc() {
     size_t run_op_counter = 0;
     while (job.op_ != nullptr) {
       // job.op_->Run(strategy_.use_event_);
-      std::this_thread::sleep_for (std::chrono::microseconds(500));
+      std::this_thread::sleep_for(std::chrono::microseconds(500));
       ++run_op_counter;
 
       auto *prev_op = job.op_;
@@ -266,7 +266,6 @@ FeedFetchList FasterSSAGraphExecutor::Run(
   std::mutex op_counter_mtx;
   std::condition_variable op_counter_cv;
   std::unordered_map<OpHandleBase *, std::atomic<size_t>> pending_ops;
-  std::atomic<size_t> tmp;
   {  // Send init job to workers
     std::vector<OpHandleBase *> ready_ops;
     for (auto &op : graph_->ops_) {
