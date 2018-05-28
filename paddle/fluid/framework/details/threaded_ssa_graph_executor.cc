@@ -261,6 +261,7 @@ FeedFetchList FasterSSAGraphExecutor::Run(
   std::unordered_map<OpHandleBase *, std::atomic<size_t>> pending_ops;
 
   {  // Send init job to workers
+    auto begin = std::chrono::high_resolution_clock::now();
     std::vector<OpHandleBase *> ready_ops;
     for (auto &op : graph_->ops_) {
       size_t deps = op->NotReadyInputSize();
@@ -269,6 +270,8 @@ FeedFetchList FasterSSAGraphExecutor::Run(
       }
       pending_ops.emplace(op.get(), deps);
     }
+    auto duration = std::chrono::high_resolution_clock::now() - begin;
+    VLOG(10) << "Prepare time " << double(duration.count()) / 1000000 << "ms";
     for (auto *op : ready_ops) {
       jobs_.enqueue(JobItem(op, &pending_ops, &op_counter));
     }
