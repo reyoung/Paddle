@@ -213,7 +213,12 @@ FasterSSAGraphExecutor::FasterSSAGraphExecutor(
     std::unique_ptr<SSAGraph> &&graph)
     : SSAGraphExecutor(std::move(graph)), strategy_(strategy) {
   for (size_t i = 0; i < strategy.num_threads_; ++i) {
+    cpu_set_t cpu_set;
+    CPU_ZERO(&cpu_set);
+    CPU_SET(i % std::thread::hardware_concurrency(), &cpu_set);
     threads_.emplace_back([this] { this->ThreadFunc(); });
+    pthread_setaffinity_np(threads_.back().native_handle(), sizeof(cpu_set),
+                           &cpu_set);
   }
 }
 void FasterSSAGraphExecutor::ThreadFunc() {
