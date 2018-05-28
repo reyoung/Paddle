@@ -14,6 +14,7 @@ limitations under the License. */
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <cmake-build-release/paddle/fluid/framework/framework.pb.h>
 #include <algorithm>
 
 #include "paddle/fluid/framework/data_transform.h"
@@ -542,17 +543,16 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
   //   Do selection
   // }
 
-  auto expected_kernel_key = this->GetExpectedKernelType(ctx);
-  VLOG(3) << "expected_kernel_key:" << expected_kernel_key;
+  OpKernelType type(proto::VarType::FP32, ctx);
 
-  auto kernel_iter = kernels.find(expected_kernel_key);
+  auto kernel_iter = kernels.find(type);
   if (kernel_iter == kernels.end()) {
     PADDLE_THROW("op %s does not have kernel for %s", type_,
-                 KernelTypeToString(expected_kernel_key));
+                 KernelTypeToString(type));
   }
 
   // do data transform
-  auto* new_dev_ctx = pool.Get(expected_kernel_key.place_);
+  auto* new_dev_ctx = pool.Get(type.place_);
   if (Type() == "fill_constant" || Type() == "gaussian_random" ||
       Type() == "uniform_random") {
     kernel_iter->second->Compute(ExecutionContext(*this, scope, *new_dev_ctx));
