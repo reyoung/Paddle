@@ -158,6 +158,7 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
         }
       }
       if (!is_forwarding && places_.size() > 1) {
+        continue;
         // Currently, we assume that once gradient is generated, it can be
         // broadcast, and each gradient is only broadcast once.
         if (static_cast<bool>(boost::get<int>(op->GetAttr(
@@ -217,10 +218,11 @@ std::unique_ptr<SSAGraph> MultiDevSSAGraphBuilder::Build(
    */
   AddOutputToLeafOps(&result);
 
-  if (VLOG_IS_ON(10)) {
+  if (VLOG_IS_ON(9)) {
     std::ostringstream sout;
     PrintGraphviz(*graph, sout);
-    VLOG(10) << sout.str();
+    VLOG(9) << sout.str();
+    std::cout << sout.str();
   }
 
   return std::unique_ptr<SSAGraph>(graph);
