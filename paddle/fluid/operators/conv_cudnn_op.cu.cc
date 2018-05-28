@@ -20,7 +20,7 @@ limitations under the License. */
 #include "paddle/fluid/platform/cudnn_helper.h"
 #include "paddle/fluid/platform/float16.h"
 
-DEFINE_bool(cudnn_algo_use_autotune, false,
+DEFINE_bool(cudnn_algo_use_autotune, true,
             "Whether allow using an autotuning algorithm for convolution "
             "operator. The autotuning algorithm may be non-deterministic. If "
             "false, the algorithm is deterministic.");
@@ -128,11 +128,11 @@ class CUDNNConvOpKernel : public framework::OpKernel<T> {
     cudnnConvolutionFwdAlgo_t algo;
     auto& dev_ctx = ctx.template device_context<platform::CUDADeviceContext>();
     auto handle = dev_ctx.cudnn_handle();
-    algo = CUDNN_CONVOLUTION_FWD_ALGO_FFT;
-//    PADDLE_ENFORCE(platform::dynload::cudnnGetConvolutionForwardAlgorithm(
-//        handle, cudnn_input_desc, cudnn_filter_desc, cudnn_conv_desc,
-//        cudnn_output_desc, CUDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT,
-//        workspace_size_limit, &algo));
+
+    PADDLE_ENFORCE(platform::dynload::cudnnGetConvolutionForwardAlgorithm(
+        handle, cudnn_input_desc, cudnn_filter_desc, cudnn_conv_desc,
+        cudnn_output_desc, CUDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT,
+        workspace_size_limit, &algo));
 
 #if CUDA_VERSION >= 9000 && CUDNN_VERSION_MIN(7, 0, 1)
     // Tensor core is supported since the volta GPU and
