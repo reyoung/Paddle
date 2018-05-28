@@ -14,7 +14,6 @@ limitations under the License. */
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include <cmake-build-release/paddle/fluid/framework/framework.pb.h>
 #include <algorithm>
 
 #include "paddle/fluid/framework/data_transform.h"
