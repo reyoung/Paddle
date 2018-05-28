@@ -151,6 +151,7 @@ include(external/grpc)
 include(external/snappy)    # download snappy
 include(external/snappystream)
 include(external/threadpool)
+include(external/concurrentqueue)
 
 include(cudnn)              # set cudnn libraries, must before configure
 include(cupti)

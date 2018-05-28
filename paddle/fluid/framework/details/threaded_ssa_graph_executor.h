@@ -21,7 +21,9 @@
 #include <vector>
 
 #include <functional>
-#include "ThreadPool.h"  // ThreadPool in thrird party
+#include "ThreadPool.h"               // ThreadPool in thrird party
+#include "blockingconcurrentqueue.h"  // NOLINT
+
 #include "paddle/fluid/framework/blocking_queue.h"
 #include "paddle/fluid/framework/details/execution_strategy.h"
 #include "paddle/fluid/framework/details/fetch_op_handle.h"
@@ -111,7 +113,7 @@ class FasterSSAGraphExecutor : public SSAGraphExecutor {
 
   void ThreadFunc();
 
-  BlockingQueue<JobItem> jobs_;
+  moodycamel::BlockingConcurrentQueue<JobItem> jobs_;
   std::vector<std::thread> threads_;
   ExecutionStrategy strategy_;
 };

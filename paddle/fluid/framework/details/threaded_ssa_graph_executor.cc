@@ -218,7 +218,8 @@ FasterSSAGraphExecutor::FasterSSAGraphExecutor(
 }
 void FasterSSAGraphExecutor::ThreadFunc() {
   while (true) {
-    auto job = jobs_.Pop();
+    JobItem job;
+    jobs_.wait_dequeue(job);
     if (job.op_ == nullptr) {  // End
       return;
     }
@@ -240,8 +241,9 @@ void FasterSSAGraphExecutor::ThreadFunc() {
               job.op_ = pending_op;
             } else {
               // Send Pending Op to other threads.
-              jobs_.Push(JobItem(pending_op, job.pending_ops_, job.op_counter_,
-                                 job.op_counter_mtx_, job.op_counter_cv_));
+              jobs_.enqueue(JobItem(pending_op, job.pending_ops_,
+                                    job.op_counter_, job.op_counter_mtx_,
+                                    job.op_counter_cv_));
             }
           }
         }
@@ -274,8 +276,8 @@ FeedFetchList FasterSSAGraphExecutor::Run(
       pending_ops.emplace(op.get(), deps);
     }
     for (auto *op : ready_ops) {
-      jobs_.Push(JobItem(op, &pending_ops, &op_counter, &op_counter_mtx,
-                         &op_counter_cv));
+      jobs_.enqueue(JobItem(op, &pending_ops, &op_counter, &op_counter_mtx,
+                            &op_counter_cv));
     }
   }
 
@@ -290,7 +292,7 @@ FeedFetchList FasterSSAGraphExecutor::Run(
 }
 FasterSSAGraphExecutor::~FasterSSAGraphExecutor() {
   for (size_t i = 0; i < strategy_.num_threads_; ++i) {
-    jobs_.Push(JobItem());
+    jobs_.enqueue(JobItem());
   }
 
   for (auto &th : threads_) {
