@@ -243,15 +243,19 @@ void FasterSSAGraphExecutor::ThreadFunc() {
               job.op_ = pending_op;
             } else {
               // Send Pending Op to other threads.
-              jobs_.enqueue(
-                  JobItem(pending_op, job.pending_ops_, job.op_counter_));
+              jobs_.enqueue(JobItem(pending_op, job.pending_ops_,
+                                    job.op_counter_, job.op_counter_mtx_,
+                                    job.op_counter_cv_));
             }
           }
         }
       }
     }
-
-    *job.op_counter_ += run_op_counter;
+    {
+      std::lock_guard<std::mutex> guard(*job.op_counter_mtx_);
+      *job.op_counter_ += run_op_counter;
+    }
+    job.op_counter_cv_->notify_one();
   }
 }
 
@@ -259,10 +263,13 @@ FeedFetchList FasterSSAGraphExecutor::Run(
     const std::vector<std::string> &fetch_tensors) {
   PADDLE_ENFORCE_EQ(fetch_tensors.size(), 0);
 
-  std::atomic<size_t> op_counter{0};
+  size_t op_counter{0};
+  std::mutex op_counter_mtx;
+  std::condition_variable op_counter_cv;
   std::unordered_map<OpHandleBase *, std::atomic<size_t>> pending_ops;
 
   {  // Send init job to workers
+    auto begin = std::chrono::high_resolution_clock::now();
     std::vector<OpHandleBase *> ready_ops;
     for (auto &op : graph_->ops_) {
       size_t deps = op->NotReadyInputSize();
@@ -271,13 +278,18 @@ FeedFetchList FasterSSAGraphExecutor::Run(
       }
       pending_ops[op.get()] = deps;
     }
+    auto duration = std::chrono::high_resolution_clock::now() - begin;
+    VLOG(10) << "Prepare time " << double(duration.count()) / 1000000 << "ms";
     for (auto *op : ready_ops) {
-      jobs_.enqueue(JobItem(op, &pending_ops, &op_counter));
+      jobs_.enqueue(JobItem(op, &pending_ops, &op_counter, &op_counter_mtx,
+                            &op_counter_cv));
     }
   }
 
   {  // Wait all worker done.
+    std::unique_lock<std::mutex> lock(op_counter_mtx);
     while (op_counter != pending_ops.size()) {
+      op_counter_cv.wait(lock);
     }
   }
 
