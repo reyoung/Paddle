@@ -228,7 +228,7 @@ void FasterSSAGraphExecutor::ThreadFunc() {
     size_t run_op_counter = 0;
     while (job.op_ != nullptr) {
       // job.op_->Run(strategy_.use_event_);
-      std::this_thread::sleep_for (std::chrono::milliseconds(1));
+      std::this_thread::sleep_for (std::chrono::microseconds(500));
       ++run_op_counter;
 
       auto *prev_op = job.op_;
