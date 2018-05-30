@@ -30,12 +30,15 @@ int main() {
   InitDevices(true);
 
   Scope scope;
+  auto& new_scope = scope.NewScope();
   std::vector<std::string> vars;
 
   for (int i = 0; i < GetCUDADeviceCount(); ++i) {
     vars.emplace_back();
-    scope.Var(&vars.back())->GetMutable<LoDTensor>();
+    new_scope.Var(&vars.back())->GetMutable<LoDTensor>();
   }
+
+  *scope.Var(details::kLocalExecScopeName)->GetMutable<Scope*>() = &new_scope;
 
   BlockingQueue<std::string> job;
   job.Extend(vars);
