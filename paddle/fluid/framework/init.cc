@@ -95,6 +95,7 @@ void InitDevices(bool init_p2p, const std::vector<int> devices) {
     count = platform::GetCUDADeviceCount();
   } catch (const std::exception &exp) {
     LOG(WARNING) << "Compiled with WITH_GPU, but no GPU found in runtime.";
+    LOG(WARNING) << exp.what();
   }
 #else
   LOG(WARNING)
