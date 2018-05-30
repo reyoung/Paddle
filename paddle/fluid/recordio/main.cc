@@ -48,7 +48,7 @@ int main() {
     input_vars.emplace_back();
     new_scope.Var(&input_vars.back())
         ->GetMutable<LoDTensor>()
-        ->Resize({64, 3, 3, 3})
+        ->Resize({40, 3, 224, 224})
         .mutable_data<float>(CUDAPlace(i));
 
     filter_vars.emplace_back();
@@ -91,7 +91,6 @@ int main() {
             CUDAPlace(item.dev_id),
             DeviceContextPool::Instance().Get(CUDAPlace(item.dev_id)));
         op_handle.Run(true);
-        //        std::this_thread::sleep_for(std::chrono::milliseconds(1));
         bool at_end;
         {
           std::lock_guard<std::mutex> guard(counter_mtx);
