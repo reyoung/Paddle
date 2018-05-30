@@ -75,7 +75,7 @@ int main() {
     thread.emplace_back([&] {
       OpDesc desc;
       desc.SetType("conv2d");
-
+      desc.SetAttr("use_cudnn", true);
       while (true) {
         auto item = job.Pop();
         if (item.dev_id == -1) {
