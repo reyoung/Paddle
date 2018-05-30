@@ -69,7 +69,8 @@ void task1(float *im_ptr_d, int im_channels, int im_height, int im_width,
   auto t1 = Clock::now();
 
   typedef std::chrono::high_resolution_clock Clock;
-
+  cudaEvent_t event;
+  cudaEventCreateWithFlags(&event, cudaEventDisableTiming);
   for (int j = 0; j < 1000; ++j) {
     for (int i = 0; i < 100000; ++i) {
       cudaSetDevice(dev_id);
@@ -84,10 +85,12 @@ void task1(float *im_ptr_d, int im_channels, int im_height, int im_width,
           im_ptr_d, num_outputs, im_height, im_width, dilation[0], dilation[1],
           filter_height, filter_width, stride[0], stride[1], padding[0],
           padding[1], col_height, col_width, col_ptr_d);
+      cudaEventRecord(event, stream);
     }
 
     std::this_thread::sleep_for(std::chrono::microseconds(300));
   }
+  cudaEventDestroy(event);
   cudaFree(im_ptr_d);
   cudaFree(col_ptr_d);
 
