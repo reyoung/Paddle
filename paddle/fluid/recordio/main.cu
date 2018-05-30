@@ -20,6 +20,7 @@
 #include <thread>  // NOLINT
 #include <vector>
 
+#include "../memory/malloc.h"
 #include "../platform/device_context.h"
 #include "../platform/place.h"
 #include "paddle/fluid/framework/init.h"
@@ -81,7 +82,7 @@ void task1(float *im_ptr_d, int im_channels, int im_height, int im_width,
         im_ptr_d, num_outputs, im_height, im_width, dilation[0], dilation[1],
         filter_height, filter_width, stride[0], stride[1], padding[0],
         padding[1], col_height, col_width, col_ptr_d);
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    std::this_thread::sleep_for(std::chrono::microseconds(300));
   }
   cudaFree(im_ptr_d);
   cudaFree(col_ptr_d);
@@ -128,10 +129,10 @@ int main() {
   src_h = new float[im_size];
 
   for (int i = 0; i < t_cnt; ++i) {
-    cudaSetDevice(i);
-    cudaMalloc(reinterpret_cast<void **>(&(src_d[i])), im_size * sizeof(float));
-    cudaMalloc(reinterpret_cast<void **>(&(dst_d[i])),
-               col_size * sizeof(float));
+    src_d[i] = reinterpret_cast<float *>(paddle::memory::Alloc(
+        paddle::platform::CUDAPlace(i), im_size * sizeof(float)));
+    dst_d[i] = reinterpret_cast<float *>(paddle::memory::Alloc(
+        paddle::platform::CUDAPlace(i), col_size * sizeof(float)));
     streams[i] = reinterpret_cast<paddle::platform::CUDADeviceContext *>(
                      paddle::platform::DeviceContextPool::Instance().Get(
                          paddle::platform::CUDAPlace(i)))
