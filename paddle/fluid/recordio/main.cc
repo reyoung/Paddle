@@ -49,13 +49,13 @@ int main() {
     input_vars.emplace_back();
     new_scope.Var(&input_vars.back())
         ->GetMutable<LoDTensor>()
-        ->Resize({40, 1024, 14, 14})
+        ->Resize({40, 128, 14, 14})
         .mutable_data<float>(CUDAPlace(i));
 
     filter_vars.emplace_back();
     new_scope.Var(&filter_vars.back())
         ->GetMutable<LoDTensor>()
-        ->Resize({1024, 1024, 1, 1})
+        ->Resize({128, 128, 3, 3})
         .mutable_data<float>(CUDAPlace(i));
 
     out_vars.emplace_back();
