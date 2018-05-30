@@ -25,6 +25,7 @@ using namespace paddle::framework;  // NOLINT
 using namespace paddle::platform;   // NOLINT
 
 USE_OP(uniform_random);
+USE_OP(conv2d);
 
 struct JobItem {
   std::string in;
@@ -47,12 +48,14 @@ int main() {
     input_vars.emplace_back();
     new_scope.Var(&input_vars.back())
         ->GetMutable<LoDTensor>()
-        ->Resize({64, 3, 3, 3});
+        ->Resize({64, 3, 3, 3})
+        .mutable_data<float>(CUDAPlace(i));
 
     filter_vars.emplace_back();
     new_scope.Var(&filter_vars.back())
         ->GetMutable<LoDTensor>()
-        ->Resize({64, 3, 3, 3});
+        ->Resize({64, 3, 3, 3})
+        .mutable_data<float>(CUDAPlace(i));
 
     out_vars.emplace_back();
     new_scope.Var(&out_vars.back())->GetMutable<LoDTensor>();
@@ -78,7 +81,7 @@ int main() {
         if (item.dev_id == -1) {
           break;
         }
-        desc.SetOutput("Out", {item.out});
+        desc.SetOutput("Output", {item.out});
         desc.SetInput("Input", {item.in});
         desc.SetInput("Filter", {item.filter});
 
@@ -88,6 +91,7 @@ int main() {
             CUDAPlace(item.dev_id),
             DeviceContextPool::Instance().Get(CUDAPlace(item.dev_id)));
         op_handle.Run(true);
+        //        std::this_thread::sleep_for(std::chrono::milliseconds(1));
         bool at_end;
         {
           std::lock_guard<std::mutex> guard(counter_mtx);

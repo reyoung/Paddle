@@ -8,4 +8,4 @@ cc_library(scanner SRCS scanner.cc DEPS chunk)
 cc_test(writer_scanner_test SRCS writer_scanner_test.cc DEPS writer scanner)
 cc_library(recordio DEPS chunk header writer scanner)
 cc_binary(test_chengduo_main SRCS main.cc DEPS init device_context op_registry uniform_random_op
-        computation_op_handle)
+        computation_op_handle conv_op)
