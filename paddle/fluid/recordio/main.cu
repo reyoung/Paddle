@@ -69,7 +69,7 @@ void task1(float *im_ptr_d, int im_channels, int im_height, int im_width,
   auto t1 = Clock::now();
 
   typedef std::chrono::high_resolution_clock Clock;
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 100000; ++i) {
     cudaSetDevice(dev_id);
     int num_outputs = im_channels * col_height * col_width;
     int blocks = (num_outputs + 1024 - 1) / 1024;
