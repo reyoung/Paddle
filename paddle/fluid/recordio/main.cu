@@ -69,19 +69,23 @@ void task1(float *im_ptr_d, int im_channels, int im_height, int im_width,
   auto t1 = Clock::now();
 
   typedef std::chrono::high_resolution_clock Clock;
-  for (int i = 0; i < 100000; ++i) {
-    cudaSetDevice(dev_id);
-    int num_outputs = im_channels * col_height * col_width;
-    int blocks = (num_outputs + 1024 - 1) / 1024;
-    int block_x = 512;
-    int block_y = (blocks + 512 - 1) / 512;
-    dim3 threads(1024, 1);
-    dim3 grid(block_x, block_y);
 
-    im2col<float><<<grid, threads, 0, stream>>>(
-        im_ptr_d, num_outputs, im_height, im_width, dilation[0], dilation[1],
-        filter_height, filter_width, stride[0], stride[1], padding[0],
-        padding[1], col_height, col_width, col_ptr_d);
+  for (int j = 0; j < 1000; ++j) {
+    for (int i = 0; i < 100000; ++i) {
+      cudaSetDevice(dev_id);
+      int num_outputs = im_channels * col_height * col_width;
+      int blocks = (num_outputs + 1024 - 1) / 1024;
+      int block_x = 512;
+      int block_y = (blocks + 512 - 1) / 512;
+      dim3 threads(1024, 1);
+      dim3 grid(block_x, block_y);
+
+      im2col<float><<<grid, threads, 0, stream>>>(
+          im_ptr_d, num_outputs, im_height, im_width, dilation[0], dilation[1],
+          filter_height, filter_width, stride[0], stride[1], padding[0],
+          padding[1], col_height, col_width, col_ptr_d);
+    }
+
     std::this_thread::sleep_for(std::chrono::microseconds(300));
   }
   cudaFree(im_ptr_d);
