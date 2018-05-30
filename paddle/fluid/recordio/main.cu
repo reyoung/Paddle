@@ -118,7 +118,7 @@ int main() {
   size_t col_size =
       im_channels * filter_height * filter_width * col_height * col_width;
 
-  const int t_cnt = 1;
+  const int t_cnt = paddle::platform::GetCUDADeviceCount();
   float *src_h;
   std::vector<float *> src_d(t_cnt);
   std::vector<float *> dst_d(t_cnt);
