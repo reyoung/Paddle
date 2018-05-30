@@ -26,6 +26,7 @@ using namespace paddle::platform;   // NOLINT
 
 USE_OP(uniform_random);
 USE_OP(conv2d);
+USE_OP_DEVICE_KERNEL(conv2d, CUDNN);
 
 struct JobItem {
   std::string in;
