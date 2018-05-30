@@ -26,22 +26,41 @@ using namespace paddle::platform;   // NOLINT
 
 USE_OP(uniform_random);
 
+struct JobItem {
+  std::string in;
+  std::string filter;
+  std::string out;
+  int dev_id;
+};
+
 int main() {
   InitDevices(true);
 
   Scope scope;
   auto& new_scope = scope.NewScope();
-  std::vector<std::string> vars;
+  std::vector<std::string> input_vars;
+  std::vector<std::string> filter_vars;
+  std::vector<std::string> out_vars;
+  BlockingQueue<JobItem> job;
 
   for (int i = 0; i < GetCUDADeviceCount(); ++i) {
-    vars.emplace_back();
-    new_scope.Var(&vars.back())->GetMutable<LoDTensor>();
+    input_vars.emplace_back();
+    new_scope.Var(&input_vars.back())
+        ->GetMutable<LoDTensor>()
+        ->Resize({64, 3, 3, 3});
+
+    filter_vars.emplace_back();
+    new_scope.Var(&filter_vars.back())
+        ->GetMutable<LoDTensor>()
+        ->Resize({64, 3, 3, 3});
+
+    out_vars.emplace_back();
+    new_scope.Var(&out_vars.back())->GetMutable<LoDTensor>();
+
+    job.Push({input_vars.back(), filter_vars.back(), out_vars.back(), i});
   }
 
   *scope.Var(details::kLocalExecScopeName)->GetMutable<Scope*>() = &new_scope;
-
-  BlockingQueue<std::string> job;
-  job.Extend(vars);
 
   size_t counter = 0;
   size_t num_iteration = 100000;
@@ -49,43 +68,45 @@ int main() {
   std::condition_variable counter_cv;
 
   std::vector<std::thread> thread;
-  for (size_t i = 0; i < vars.size(); ++i) {
-    thread.emplace_back(
-        [i, &counter, &num_iteration, &counter_mtx, &counter_cv, &scope, &job] {
-          OpDesc desc;
-          desc.SetType("uniform_random");
-          desc.SetAttr("shape", std::vector<int>{64, 224, 224});
+  for (size_t i = 0; i < input_vars.size(); ++i) {
+    thread.emplace_back([&] {
+      OpDesc desc;
+      desc.SetType("conv2d");
 
-          while (true) {
-            auto name = job.Pop();
-            if (name.empty()) {
-              break;
-            }
-            desc.SetOutput("Out", {name});
+      while (true) {
+        auto item = job.Pop();
+        if (item.dev_id == -1) {
+          break;
+        }
+        desc.SetOutput("Out", {item.out});
+        desc.SetInput("Input", {item.in});
+        desc.SetInput("Filter", {item.filter});
 
-            details::ComputationOpHandle op_handle(desc, &scope, CUDAPlace(i));
-            op_handle.SetDeviceContext(
-                CUDAPlace(i), DeviceContextPool::Instance().Get(CUDAPlace(i)));
-            op_handle.Run(true);
-            bool at_end;
-            {
-              std::lock_guard<std::mutex> guard(counter_mtx);
-              ++counter;
-              at_end = counter == num_iteration;
-            }
-            if (!at_end) {
-              job.Push(name);
-            }
-            counter_cv.notify_one();
-          }
-        });
+        details::ComputationOpHandle op_handle(desc, &scope,
+                                               CUDAPlace(item.dev_id));
+        op_handle.SetDeviceContext(
+            CUDAPlace(item.dev_id),
+            DeviceContextPool::Instance().Get(CUDAPlace(item.dev_id)));
+        op_handle.Run(true);
+        bool at_end;
+        {
+          std::lock_guard<std::mutex> guard(counter_mtx);
+          ++counter;
+          at_end = counter == num_iteration;
+        }
+        if (!at_end) {
+          job.Push(item);
+        }
+        counter_cv.notify_one();
+      }
+    });
   }
 
   std::unique_lock<std::mutex> lock(counter_mtx);
   counter_cv.wait(lock, [&] { return counter == num_iteration; });
 
-  for (size_t i = 0; i < vars.size(); ++i) {
-    job.Push("");
+  for (size_t i = 0; i < input_vars.size(); ++i) {
+    job.Push({"", "", "", -1});
   }
 
   for (auto& th : thread) {
