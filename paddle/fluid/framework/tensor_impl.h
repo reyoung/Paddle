@@ -87,6 +87,7 @@ inline void* Tensor::mutable_data(platform::Place place, std::type_index type) {
     VLOG(10) << holder_->size() << " " << size + offset_ << " " << size << " "
              << offset_;
     VLOG(10) << holder_->place() << " " << place;
+    VLOG(10) << holder_->ptr();
   }
   if (holder_ == nullptr || !(holder_->place() == place) ||
       holder_->size() < size + offset_) {
