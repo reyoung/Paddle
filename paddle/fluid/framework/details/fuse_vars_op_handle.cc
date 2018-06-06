@@ -26,13 +26,14 @@ void FuseVarsOpHandle::RunImpl() {
   PADDLE_ENFORCE_EQ(in_var_handles.size(), 0);
   PADDLE_ENFORCE_EQ(out_var_handles.size() - 1, inputs_numel_.size(), "");
 
-  auto scope = local_scope_->FindVar(kLocalExecScopeName)->Get<Scope *>();
+  auto scope = local_scope_->FindVar(kLocalExecScopeName)->Get<Scope*>();
 
   auto out_var_handle = out_var_handles[0];
   auto out_var = scope->Var(out_var_handle->name_);
 
   auto out_tensor = out_var->GetMutable<LoDTensor>();
-  out_tensor->Resize({total_numel_}).mutable_data(this->place_, type_);
+  void* ptr = out_tensor->Resize({total_numel_}).mutable_data(place_, type_);
+  VLOG(10) << "Pointer to shared " << ptr;
 
   int64_t s = 0;
   for (size_t i = 1; i < out_var_handles.size(); ++i) {

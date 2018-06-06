@@ -150,6 +150,8 @@ class ElementwiseAddGradKernel : public framework::OpKernel<T> {
     if (platform::is_cpu_place(ctx.GetPlace()) && (x->dims() == y->dims())) {
       elementwise_add_grad<DeviceContext, T>(ctx, x, y, out, dout, dx, dy);
     } else {
+      VLOG(10) << "DY Ptr " << dy->mutable_data<T>(ctx.GetPlace());
+      VLOG(10) << "DX Ptr " << dx->mutable_data<T>(ctx.GetPlace());
       default_elementwise_add_grad<DeviceContext, T>(ctx, x, y, out, dout, dx,
                                                      dy);
     }
