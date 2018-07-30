@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import core
 import multiprocessing
-import framework
-import executor
-import warnings
-import sys
 import os
+import sys
+
+import core
+
+import executor
+import framework
 
 __all__ = ['ParallelExecutor', 'ExecutionStrategy', 'BuildStrategy']
 
@@ -266,6 +267,11 @@ class ParallelExecutor(object):
             self.executor.feed_tensors_into_local_scopes(res)
 
         fetch_var_name = '@FETCHED_VAR_NAME@'
+
+        for i in range(len(fetch_list)):
+            if isinstance(fetch_list[i], framework.Variable):
+                fetch_list[i] = fetch_list[i].name
+
         self.executor.run(fetch_list, fetch_var_name)
         arr = self.scope.find_var(fetch_var_name).get_lod_tensor_array()
 
