@@ -1296,7 +1296,7 @@ class Program(object):
         self.desc = core.ProgramDesc()
         self.blocks = [Block(self, 0)]
         self.current_block_idx = 0
-        self._seed = 0
+        self._seed = 2
         self._current_role = core.op_proto_and_checker_maker.OpRole.Forward
         self._op_role_var = []
 

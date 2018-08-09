@@ -945,7 +945,7 @@ def dropout(x, dropout_prob, is_test=False, seed=None, name=None):
             x = fluid.layers.data(name="data", shape=[32, 32], dtype="float32")
             droped = fluid.layers.dropout(x, dropout_prob=0.5)
     """
-
+    return x
     helper = LayerHelper('dropout', **locals())
     out = helper.create_tmp_variable(dtype=x.dtype)
     mask = helper.create_tmp_variable(dtype=x.dtype, stop_gradient=True)
