@@ -219,11 +219,14 @@ PYBIND11_PLUGIN(core) {
              std::copy(lod.begin(), lod.end(), std::back_inserter(new_lod));
              return new_lod;
            })
-      .def("has_valid_recursive_sequence_lengths", [](LoDTensor &self) -> bool {
-        // Check that the lod info is valid and match the outermost
-        // dimension of the LoDTensor data
-        return CheckLoD(self.lod(), vectorize(self.dims()).front());
-      });
+      .def("has_valid_recursive_sequence_lengths",
+           [](LoDTensor &self) -> bool {
+             // Check that the lod info is valid and match the outermost
+             // dimension of the LoDTensor data
+             return CheckLoD(self.lod(), vectorize(self.dims()).front());
+           })
+      .def("is_inited",
+           [](LoDTensor &self) -> bool { return self.IsInitialized(); });
 
   py::class_<SelectedRows>(m, "SelectedRows")
       .def("__init__",
@@ -275,6 +278,8 @@ All parameter, weight, gradient are variables in Paddle.
              return self.GetMutable<LoDTensor>();
            },
            py::return_value_policy::reference)
+      .def("is_tensor",
+           [](Variable &self) -> bool { return self.IsType<LoDTensor>(); })
       .def("get_lod_rank_table",
            [](Variable &self) { return self.GetMutable<LoDRankTable>(); },
            py::return_value_policy::reference)
@@ -670,6 +675,11 @@ All parameter, weight, gradient are variables in Paddle.
       .def("local_scopes",
            [](ParallelExecutor &self) -> std::vector<Scope *> * {
              return &self.GetLocalScopes();
+           },
+           py::return_value_policy::reference)
+      .def("get_local_scope",
+           [](ParallelExecutor &self, size_t i) -> Scope * {
+             return self.GetLocalScopes().at(i);
            },
            py::return_value_policy::reference)
       .def("feed_tensors_into_local_scopes",
