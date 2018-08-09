@@ -47,7 +47,7 @@ FeedFetchList ScopeBufferedSSAGraphExecutor::Run(
           continue;
         }
 
-        if (info.persistable_) {  // Persistable
+        if (true) {  // Persistable
           InitializeVariable(scope->Var(info.name_), info.type_);
         } else {
           InitializeVariable(local_scope.Var(info.name_), info.type_);
