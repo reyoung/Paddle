@@ -158,3 +158,7 @@ Examples:
     >>> data = fluid.layers.data(name="input", shape=[1])
     >>> result = fluid.layers.thresholded_relu(data, threshold=0.4)
 """
+
+__all__ += ['sequence_concat']
+
+sequence_concat = generate_layer_fn('sequence_concat')
