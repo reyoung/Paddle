@@ -24,8 +24,18 @@ using Tensor = framework::Tensor;
 using LoDTensor = framework::LoDTensor;
 using LoD = framework::LoD;
 
+template <typename T1, typename T2, typename Callback>
+std::vector<T1> VecTransform(const std::vector<T2>& vec, Callback callback) {
+  std::vector<T1> ret;
+  ret.reserve(vec.size());
+  for (auto& tmp : vec) {
+    ret.emplace_back(callback(tmp));
+  }
+  return ret;
+}
+
 template <typename T>
-LoD ConcatLoD(const std::vector<const T*> ins, const size_t level) {
+LoD ConcatLoD(const std::vector<const T*>& ins, size_t level) {
   auto out_lod = ins[0]->lod();
   auto numLevels = ins[0]->NumLevels();
   const size_t n = ins.size();
@@ -69,7 +79,6 @@ class SequenceConcatOpKernel : public framework::OpKernel<T> {
     const size_t axis = static_cast<size_t>(ctx.Attr<int>("axis"));
     const size_t level = static_cast<size_t>(ctx.Attr<int>("level"));
     const size_t n = ins.size();
-
     for (size_t i = 1; i < n; ++i) {
       PADDLE_ENFORCE_EQ(ins[0]->NumLevels(), ins[i]->NumLevels(),
                         "The levels of all the input LoDTensors "
@@ -125,6 +134,7 @@ class SequenceConcatGradOpKernel : public framework::OpKernel<T> {
  public:
   void Compute(const framework::ExecutionContext& ctx) const override {
     auto ins = ctx.MultiInput<framework::LoDTensor>("X");
+
     auto* out_grad =
         ctx.Input<framework::LoDTensor>(framework::GradVarName("Out"));
     auto x_grads =
@@ -135,16 +145,27 @@ class SequenceConcatGradOpKernel : public framework::OpKernel<T> {
 
     // Set Grad(X) LoD as X
     for (size_t i = 0; i < n; i++) {
-      x_grads[i]->set_lod(ins[i]->lod());
       x_grads[i]->mutable_data<T>(ctx.GetPlace());
+      x_grads[i]->set_lod(ins[i]->lod());
     }
+
     auto out_lod = ins[0]->lod();
     if (axis == 0UL) {
       out_lod = ConcatLoD<LoDTensor>(ins, level);
     }
-    const size_t level_idx = out_lod.size() - level - 1;
-    auto out_lod_level = framework::ToAbsOffset(out_lod)[level_idx];
 
+    const size_t level_idx = out_lod.size() - level - 1;
+    auto out_lod_abs = framework::ToAbsOffset(out_lod);
+    auto& out_lod_level = out_lod_abs[level_idx];
+    auto dx_abs_lods = VecTransform<framework::Vector<size_t>, LoDTensor*>(
+        x_grads, [&](LoDTensor* tensor) {
+          auto abs_lod = framework::ToAbsOffset(tensor->lod());
+          PADDLE_ENFORCE_LT(level_idx, abs_lod.size());
+          framework::Vector<size_t> ret = abs_lod[level_idx];
+          abs_lod.clear();
+          return ret;
+        });
+    VLOG(3) << "";
     for (size_t i = 0; i < out_lod_level.size() - 1; ++i) {
       Tensor out_grad_t =
           out_grad->Slice(static_cast<int>(out_lod_level[i]),
@@ -153,19 +174,24 @@ class SequenceConcatGradOpKernel : public framework::OpKernel<T> {
       size_t offset = 0;
 
       for (size_t j = 0; j < n; ++j) {
-        auto x_grad_lod_level =
-            framework::ToAbsOffset(x_grads[j]->lod())[level_idx];
         auto x_grad_stride = framework::stride(x_grads[j]->dims());
+        auto& dx_abs_lod = dx_abs_lods[j];
         Tensor x_grad_t =
-            x_grads[j]->Slice(static_cast<int>(x_grad_lod_level[i]),
-                              static_cast<int>(x_grad_lod_level[i + 1]));
+            x_grads[j]->Slice(static_cast<int>(dx_abs_lod[i]),
+                              static_cast<int>(dx_abs_lod[i + 1]));
         size_t axis_dim = x_grad_t.dims()[axis];
         StridedMemcpy<T>(ctx.device_context(), out_grad_t.data<T>() + offset,
                          out_grad_stride, out_grad_t.dims(), x_grad_stride,
                          x_grad_t.data<T>());
         offset += axis_dim * out_grad_stride[axis];
+
+        VLOG(3) << "";
       }
+
+      VLOG(3) << "";
     }
+
+    { VLOG(3) << ""; }
   }
 };
 

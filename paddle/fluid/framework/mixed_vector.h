@@ -86,10 +86,10 @@ class Vector {
   Vector(Vector<T> &&other) {
     this->size_ = other.size_;
     this->flag_ = other.flag_;
-    if (other.cuda_vec_.memory_size()) {
+    if (other.cuda_vec_.IsInitialized()) {
       this->cuda_vec_.ShareDataWith(other.cuda_vec_);
     }
-    if (other.cpu_vec_.memory_size()) {
+    if (other.cpu_vec_.IsInitialized()) {
       this->cpu_vec_.ShareDataWith(other.cpu_vec_);
     }
   }
