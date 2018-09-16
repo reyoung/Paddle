@@ -181,6 +181,29 @@ class RecurrentBase : public framework::OperatorBase {
     }
   }
 
+  template <typename Callback>
+  static void LinkNotEmptyTensorWithCallback(
+      const framework::Scope &src_scope,
+      const std::vector<std::string> &src_vars,
+      const framework::Scope &dst_scope,
+      const std::vector<std::string> &dst_vars, Callback callback) {
+    PADDLE_ENFORCE_EQ(src_vars.size(), dst_vars.size());
+    std::vector<std::string> not_empty_srcs;
+    std::vector<std::string> not_empty_dsts;
+
+    for (size_t i = 0; i < src_vars.size(); ++i) {
+      if (src_vars[i] == framework::kEmptyVarName ||
+          dst_vars[i] == framework::kEmptyVarName) {
+        continue;
+      }
+
+      not_empty_dsts.emplace_back(dst_vars[i]);
+      not_empty_srcs.emplace_back(src_vars[i]);
+    }
+    LinkTensorWithCallback(src_scope, not_empty_srcs, dst_scope, not_empty_dsts,
+                           callback);
+  }
+
   // (seq_len, shape) -> return [seq_len] + list(shape)
   static framework::DDim PrependDims(size_t seq_len,
                                      const framework::DDim &src) {
@@ -440,7 +463,7 @@ class RecurrentGradOp : public RecurrentBase {
 
       // Copy input gradient from inside to outside
       //   outside::input_grad[seq_offset: seq_offset + 1] = inside::input_grad
-      LinkTensorWithCallback(
+      LinkNotEmptyTensorWithCallback(
           cur_scope, GradVarLists(Inputs(kInputs)), scope, Outputs(kInputGrads),
           [&](const framework::LoDTensor &inside,
               framework::LoDTensor *outside) {
@@ -459,7 +482,7 @@ class RecurrentGradOp : public RecurrentBase {
 
       if (step_id + 1 == seq_len) {  // at_end
         // copy initialize states gradient from inside to outside
-        LinkTensorWithCallback(
+        LinkNotEmptyTensorWithCallback(
             cur_scope, GradVarLists(Attr<std::vector<std::string>>(kExStates)),
             scope, Outputs(kInitStateGrads),
             [&](const framework::LoDTensor &inside,
@@ -609,14 +632,28 @@ class RecurrentGradOpShapeInference : public framework::InferShapeBase {
     std::vector<std::string> output{kOutputs};
     for (auto &s : input) {
       PADDLE_ENFORCE(ctx->HasInputs(s));
-      PADDLE_ENFORCE(ctx->HasOutputs(framework::GradVarName(s)),
-                     "Cannot find the gradient variable %s",
-                     framework::GradVarName(s));
     }
     for (auto &s : output) {
       PADDLE_ENFORCE(ctx->HasInputs(s));
     }
+
+    std::vector<std::string> arg_names;
+    std::vector<framework::DDim> arg_ddims;
     for (auto &s : input) {
+      auto igs = ctx->Outputs(framework::GradVarName(s));
+      auto inputs_dim = ctx->GetInputsDim(s);
+      PADDLE_ENFORCE_EQ(igs.size(), inputs_dim.size());
+
+      for (size_t i = 0; i < igs.size(); ++i) {
+        auto &ig = igs[i];
+        if (ig == framework::kEmptyVarName) {
+          continue;
+        }
+        auto i_dim = inputs_dim[i];
+        arg_names.emplace_back(ig);
+        arg_ddims.emplace_back(i_dim);
+      }
+      ctx->SetDims(arg_names, arg_ddims);
       ctx->SetOutputsDim(framework::GradVarName(s), ctx->GetInputsDim(s));
     }
     if (ctx->HasInputs(kParameters)) {
