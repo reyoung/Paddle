@@ -35,6 +35,7 @@ struct ComputationOpHandle : public OpHandleBase {
   const Scope *GetScope() const { return scope_; }
 
   const platform::Place &GetPlace() const { return place_; }
+  void RecordWaitEventOnCtx(platform::DeviceContext *waited_ctx) override;
 
  protected:
   void RunImpl() override;

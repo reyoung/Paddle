@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "paddle/fluid/framework/details/computation_op_handle.h"
-
 #include <string>
+#include "paddle/fluid/framework/op_info.h"
 
 namespace paddle {
 namespace framework {
@@ -28,10 +28,14 @@ ComputationOpHandle::ComputationOpHandle(ir::Node *node, Scope *scope,
 
 void ComputationOpHandle::RunImpl() {
   WaitInputVarGenerated(place_);
-
-  this->RunAndRecordEvent([this] {
+  if (platform::is_gpu_place(place_) && op_->SupportGPU()) {
+    this->RunAndRecordEvent([this] {
+      op_->Run(*scope_->FindVar(kLocalExecScopeName)->Get<Scope *>(), place_);
+    });
+  } else {
+    // Do not record event on CPU kernels.
     op_->Run(*scope_->FindVar(kLocalExecScopeName)->Get<Scope *>(), place_);
-  });
+  }
 }
 
 bool ComputationOpHandle::NeedWait(VarHandleBase *in_var) {
@@ -42,6 +46,15 @@ bool ComputationOpHandle::NeedWait(VarHandleBase *in_var) {
 }
 
 std::string ComputationOpHandle::Name() const { return op_->Type(); }
+
+void ComputationOpHandle::RecordWaitEventOnCtx(
+    platform::DeviceContext *waited_ctx) {
+  if (platform::is_gpu_place(place_) && op_->SupportGPU()) {
+    OpHandleBase::RecordWaitEventOnCtx(waited_ctx);
+  } else {
+    // Do nothing on CPU kernels, since CPU kernel are always sync.
+  }
+}
 }  // namespace details
 }  // namespace framework
 }  // namespace paddle
