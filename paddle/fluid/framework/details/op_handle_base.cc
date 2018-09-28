@@ -65,10 +65,9 @@ void OpHandleBase::RecordWaitEventOnCtx(platform::DeviceContext *waited_ctx) {
       dev_ctx.second->Wait();
     }
   } else {
-    auto stream =
-        static_cast<platform::CUDADeviceContext *>(waited_ctx)->stream();
+    auto cuda_ctx = static_cast<platform::CUDADeviceContext *>(waited_ctx);
     for (auto &ev : events_) {
-      PADDLE_ENFORCE(cudaStreamWaitEvent(stream, ev.second, 0));
+      cuda_ctx->WaitEvent(ev.second);
     }
   }
 #else

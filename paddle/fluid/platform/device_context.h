@@ -115,6 +115,11 @@ class CUDADeviceContext : public DeviceContext {
     PADDLE_ENFORCE(cudaEventRecord(ev, stream_));
   }
 
+  void WaitEvent(cudaEvent_t ev) {
+    std::lock_guard<std::mutex> guard(mtx_);
+    PADDLE_ENFORCE(cudaStreamWaitEvent(stream_, ev, 0));
+  }
+
   template <typename Callback>
   void AddStreamCallback(Callback&& callback) const {
     std::lock_guard<std::mutex> guard(callback_mtx_);
